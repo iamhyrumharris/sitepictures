@@ -1,0 +1,478 @@
+openapi: 3.0.3
+info:
+  title: FieldPhoto Pro Sync API
+  description: REST API for synchronizing industrial photo management data
+  version: 1.0.0
+
+servers:
+  - url: https://api.fieldphoto.example.com/v1
+    description: Production server
+  - url: http://localhost:3000/v1
+    description: Development server
+
+security:
+  - deviceAuth: []
+
+paths:
+  /sync/changes:
+    post:
+      summary: Upload pending changes from device
+      description: Batch upload of all pending sync packages from offline device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                  description: Device identifier
+                packages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SyncPackage'
+      responses:
+        '200':
+          description: Changes processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: integer
+                    description: Number of packages processed
+                  conflicts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConflictResolution'
+        '400':
+          description: Invalid request data
+        '409':
+          description: Sync conflicts require resolution
+
+  /sync/changes/{since}:
+    get:
+      summary: Download changes since timestamp
+      description: Get all changes from other devices since given timestamp
+      parameters:
+        - name: since
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: ISO timestamp of last sync
+        - name: deviceId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Requesting device ID
+      responses:
+        '200':
+          description: Changes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SyncPackage'
+                  lastModified:
+                    type: string
+                    format: date-time
+
+  /photos:
+    post:
+      summary: Upload photo file
+      description: Upload full-resolution photo with metadata
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Photo file data
+                metadata:
+                  $ref: '#/components/schemas/Photo'
+      responses:
+        '201':
+          description: Photo uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photoId:
+                    type: string
+                    format: uuid
+                  downloadUrl:
+                    type: string
+                    format: uri
+        '413':
+          description: Photo file too large
+        '422':
+          description: Invalid photo format
+
+  /photos/{photoId}:
+    get:
+      summary: Download photo file
+      description: Retrieve full-resolution photo by ID
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Photo retrieved successfully
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Photo not found
+
+  /companies/{companyId}/structure:
+    get:
+      summary: Get company organizational structure
+      description: Retrieve complete hierarchy for company
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Structure retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyStructure'
+
+  /boundaries:
+    post:
+      summary: Create GPS boundary
+      description: Define new geographic boundary for photo organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GPSBoundary'
+      responses:
+        '201':
+          description: Boundary created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GPSBoundary'
+
+  /boundaries/detect/{lat}/{lng}:
+    get:
+      summary: Detect boundaries at location
+      description: Find all boundaries containing given GPS coordinates
+      parameters:
+        - name: lat
+          in: path
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: lng
+          in: path
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: companyId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Boundaries detected
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BoundaryMatch'
+
+components:
+  securitySchemes:
+    deviceAuth:
+      type: apiKey
+      in: header
+      name: X-Device-ID
+      description: Device-based authentication using UUID
+
+  schemas:
+    Photo:
+      type: object
+      required:
+        - id
+        - equipmentId
+        - fileName
+        - fileHash
+        - capturedAt
+        - deviceId
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipmentId:
+          type: string
+          format: uuid
+        revisionId:
+          type: string
+          format: uuid
+          nullable: true
+        fileName:
+          type: string
+          maxLength: 255
+        fileHash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: SHA-256 hash
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          nullable: true
+        capturedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+        deviceId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isSynced:
+          type: boolean
+
+    SyncPackage:
+      type: object
+      required:
+        - id
+        - entityType
+        - entityId
+        - operation
+        - data
+        - timestamp
+        - deviceId
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        entityType:
+          type: string
+          enum: [Photo, Client, Site, Equipment, Revision, GPSBoundary]
+        entityId:
+          type: string
+          format: uuid
+        operation:
+          type: string
+          enum: [CREATE, UPDATE, DELETE]
+        data:
+          type: object
+          description: Entity data snapshot
+        timestamp:
+          type: string
+          format: date-time
+        deviceId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, SYNCING, SYNCED, FAILED]
+        retryCount:
+          type: integer
+          minimum: 0
+          maximum: 10
+        lastAttempt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ConflictResolution:
+      type: object
+      required:
+        - entityId
+        - entityType
+        - conflictType
+        - versions
+      properties:
+        entityId:
+          type: string
+          format: uuid
+        entityType:
+          type: string
+        conflictType:
+          type: string
+          enum: [CONCURRENT_UPDATE, DELETE_CONFLICT]
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              deviceId:
+                type: string
+                format: uuid
+              timestamp:
+                type: string
+                format: date-time
+              data:
+                type: object
+        resolution:
+          type: string
+          enum: [MERGE_ALL, USER_CHOICE_REQUIRED]
+          default: MERGE_ALL
+
+    GPSBoundary:
+      type: object
+      required:
+        - id
+        - name
+        - centerLatitude
+        - centerLongitude
+        - radiusMeters
+        - priority
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+          nullable: true
+        siteId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          maxLength: 100
+        centerLatitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        centerLongitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        radiusMeters:
+          type: number
+          format: double
+          minimum: 1
+          maximum: 10000
+        priority:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    BoundaryMatch:
+      type: object
+      properties:
+        boundary:
+          $ref: '#/components/schemas/GPSBoundary'
+        distance:
+          type: number
+          format: double
+          description: Distance from center in meters
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+
+    CompanyStructure:
+      type: object
+      properties:
+        company:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+        clients:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              sites:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    parentSiteId:
+                      type: string
+                      format: uuid
+                      nullable: true
+                    equipment:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          equipmentType:
+                            type: string
+                            nullable: true

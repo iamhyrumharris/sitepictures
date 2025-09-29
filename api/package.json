@@ -1,0 +1,46 @@
+{
+  "name": "fieldphoto-api",
+  "version": "1.0.0",
+  "description": "REST API for FieldPhoto Pro industrial photo management",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:contract": "jest --testPathPattern=tests/contract",
+    "test:conflicts": "jest tests/conflicts.test.js",
+    "migrate": "node src/database/migrate.js",
+    "migrate:test": "NODE_ENV=test npm run migrate",
+    "lint": "eslint src/",
+    "format": "prettier --write 'src/**/*.js'",
+    "config:validate": "node scripts/validate-config.js",
+    "ssl:check": "node scripts/check-ssl.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "pg-pool": "^3.6.1",
+    "joi": "^17.11.0",
+    "multer": "^2.0.0-rc.1",
+    "uuid": "^9.0.1",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.1.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "nodemon": "^3.0.2",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.1",
+    "@types/jest": "^29.5.11"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

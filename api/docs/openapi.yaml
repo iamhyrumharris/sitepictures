@@ -1,0 +1,17 @@
+# This is a reference to the already created API specification
+# The actual OpenAPI documentation is located at:
+# /specs/001-build-an-industrial/contracts/api-spec.yaml
+
+# For production deployment, copy the api-spec.yaml to this location
+# or create a symlink:
+# ln -s ../../specs/001-build-an-industrial/contracts/api-spec.yaml openapi.yaml
+
+# The API documentation includes:
+# - Device-based authentication
+# - Sync endpoints for offline/online synchronization
+# - Photo upload and retrieval endpoints
+# - Company structure management
+# - GPS boundary detection and management
+
+# Refer to the full specification at:
+# /specs/001-build-an-industrial/contracts/api-spec.yaml
