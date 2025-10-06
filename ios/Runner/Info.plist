@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to capture photos of equipment.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to tag photos with GPS coordinates.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to save captured photos.</string>
 </dict>
 </plist>

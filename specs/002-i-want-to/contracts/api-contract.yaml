@@ -1,0 +1,635 @@
+openapi: 3.0.0
+info:
+  title: Site Pictures API
+  version: 1.0.0
+  description: API for industrial site photo documentation
+
+servers:
+  - url: https://api.sitepictures.com/v1
+    description: Production server
+  - url: http://localhost:8080/v1
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      required: [id, email, name, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          maxLength: 100
+        role:
+          type: string
+          enum: [ADMIN, TECHNICIAN, VIEWER]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Client:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    MainSite:
+      type: object
+      required: [id, clientId, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        address:
+          type: string
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    SubSite:
+      type: object
+      required: [id, mainSiteId, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        mainSiteId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    Equipment:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        mainSiteId:
+          type: string
+          format: uuid
+          nullable: true
+        subSiteId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          maxLength: 100
+        serialNumber:
+          type: string
+        manufacturer:
+          type: string
+        model:
+          type: string
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    Photo:
+      type: object
+      required: [id, equipmentId, latitude, longitude, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipmentId:
+          type: string
+          format: uuid
+        remoteUrl:
+          type: string
+          format: uri
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+        capturedBy:
+          type: string
+          format: uuid
+        fileSize:
+          type: integer
+        syncedAt:
+          type: string
+          format: date-time
+
+    SyncPayload:
+      type: object
+      required: [entities, lastSyncAt]
+      properties:
+        entities:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [client, mainSite, subSite, equipment, photo]
+              operation:
+                type: string
+                enum: [create, update, delete]
+              data:
+                type: object
+        lastSyncAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /clients:
+    get:
+      summary: List all clients
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+
+    post:
+      summary: Create new client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+
+  /clients/{clientId}:
+    get:
+      summary: Get client details
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+
+  /clients/{clientId}/sites:
+    get:
+      summary: List main sites for client
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of main sites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MainSite'
+
+    post:
+      summary: Create main site
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                address:
+                  type: string
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+      responses:
+        '201':
+          description: Site created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MainSite'
+
+  /sites/{siteId}/subsites:
+    get:
+      summary: List subsites for main site
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of subsites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubSite'
+
+    post:
+      summary: Create subsite
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Subsite created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubSite'
+
+  /sites/{siteId}/equipment:
+    get:
+      summary: List equipment for site
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of equipment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Equipment'
+
+  /subsites/{subsiteId}/equipment:
+    get:
+      summary: List equipment for subsite
+      parameters:
+        - name: subsiteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of equipment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Equipment'
+
+  /equipment:
+    post:
+      summary: Create equipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                mainSiteId:
+                  type: string
+                  format: uuid
+                subSiteId:
+                  type: string
+                  format: uuid
+                serialNumber:
+                  type: string
+                manufacturer:
+                  type: string
+                model:
+                  type: string
+      responses:
+        '201':
+          description: Equipment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+
+  /equipment/{equipmentId}/photos:
+    get:
+      summary: List photos for equipment
+      parameters:
+        - name: equipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of photos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  photos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Photo'
+
+    post:
+      summary: Upload photo for equipment
+      parameters:
+        - name: equipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo, latitude, longitude, timestamp]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+
+  /sync:
+    post:
+      summary: Sync local changes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPayload'
+      responses:
+        '200':
+          description: Sync successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  syncedAt:
+                    type: string
+                    format: date-time
+                  conflicts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        entityId:
+                          type: string
+                        type:
+                          type: string
+                        resolution:
+                          type: string
+
+  /users/recent-locations:
+    get:
+      summary: Get user's recent locations
+      responses:
+        '200':
+          description: Recent locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    clientId:
+                      type: string
+                    clientName:
+                      type: string
+                    mainSiteId:
+                      type: string
+                    mainSiteName:
+                      type: string
+                    subSiteId:
+                      type: string
+                    subSiteName:
+                      type: string
+                    equipmentId:
+                      type: string
+                    equipmentName:
+                      type: string
+                    accessedAt:
+                      type: string
+                      format: date-time
+                    navigationPath:
+                      type: string

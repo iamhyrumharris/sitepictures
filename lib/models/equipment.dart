@@ -2,55 +2,60 @@ import 'package:uuid/uuid.dart';
 
 class Equipment {
   final String id;
-  final String siteId;
+  final String? mainSiteId;
+  final String? subSiteId;
   final String name;
-  final String? equipmentType;
   final String? serialNumber;
-  final String? model;
   final String? manufacturer;
-  final List<String> tags;
+  final String? model;
+  final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
 
   Equipment({
     String? id,
-    required this.siteId,
+    this.mainSiteId,
+    this.subSiteId,
     required this.name,
-    this.equipmentType,
     this.serialNumber,
-    this.model,
     this.manufacturer,
-    List<String>? tags,
+    this.model,
+    required this.createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
-  })  : id = id ?? const Uuid().v4(),
-        tags = tags ?? [],
+  })  : assert(
+          (mainSiteId != null) != (subSiteId != null),
+          'Equipment must belong to exactly one of MainSite or SubSite (XOR constraint)',
+        ),
+        id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
     if (name.isEmpty || name.length > 100) return false;
-    if (tags.length > 10) return false;
-    for (final tag in tags) {
-      if (tag.isEmpty || tag.length > 30) return false;
-    }
+    if (createdBy.isEmpty) return false;
+    // XOR validation: exactly one of mainSiteId or subSiteId must be non-null
+    if ((mainSiteId == null) == (subSiteId == null)) return false;
     return true;
   }
+
+  // Get parent site ID (whichever is non-null)
+  String get parentSiteId => mainSiteId ?? subSiteId!;
 
   // Convert to Map for database storage
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'site_id': siteId,
+      'main_site_id': mainSiteId,
+      'sub_site_id': subSiteId,
       'name': name,
-      'equipment_type': equipmentType,
       'serial_number': serialNumber,
-      'model': model,
       'manufacturer': manufacturer,
-      'tags': tags.join(','),
+      'model': model,
+      'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'is_active': isActive ? 1 : 0,
@@ -61,41 +66,70 @@ class Equipment {
   factory Equipment.fromMap(Map<String, dynamic> map) {
     return Equipment(
       id: map['id'],
-      siteId: map['site_id'],
+      mainSiteId: map['main_site_id'],
+      subSiteId: map['sub_site_id'],
       name: map['name'],
-      equipmentType: map['equipment_type'],
       serialNumber: map['serial_number'],
-      model: map['model'],
       manufacturer: map['manufacturer'],
-      tags: map['tags'] != null && map['tags'].toString().isNotEmpty
-          ? map['tags'].toString().split(',')
-          : [],
+      model: map['model'],
+      createdBy: map['created_by'],
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
       isActive: map['is_active'] == 1,
     );
   }
 
+  // Create from API JSON
+  factory Equipment.fromJson(Map<String, dynamic> json) {
+    return Equipment(
+      id: json['id'],
+      mainSiteId: json['mainSiteId'],
+      subSiteId: json['subSiteId'],
+      name: json['name'],
+      serialNumber: json['serialNumber'],
+      manufacturer: json['manufacturer'],
+      model: json['model'],
+      createdBy: json['createdBy'],
+      createdAt: DateTime.parse(json['createdAt']),
+      updatedAt: DateTime.parse(json['updatedAt']),
+      isActive: json['isActive'] ?? true,
+    );
+  }
+
+  // Convert to JSON for API
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'mainSiteId': mainSiteId,
+      'subSiteId': subSiteId,
+      'name': name,
+      'serialNumber': serialNumber,
+      'manufacturer': manufacturer,
+      'model': model,
+      'createdBy': createdBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isActive': isActive,
+    };
+  }
+
   // Create copy with updates
   Equipment copyWith({
-    String? siteId,
     String? name,
-    String? equipmentType,
     String? serialNumber,
-    String? model,
     String? manufacturer,
-    List<String>? tags,
+    String? model,
     bool? isActive,
   }) {
     return Equipment(
       id: id,
-      siteId: siteId ?? this.siteId,
+      mainSiteId: mainSiteId,
+      subSiteId: subSiteId,
       name: name ?? this.name,
-      equipmentType: equipmentType ?? this.equipmentType,
       serialNumber: serialNumber ?? this.serialNumber,
-      model: model ?? this.model,
       manufacturer: manufacturer ?? this.manufacturer,
-      tags: tags ?? this.tags,
+      model: model ?? this.model,
+      createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       isActive: isActive ?? this.isActive,
@@ -104,7 +138,7 @@ class Equipment {
 
   @override
   String toString() {
-    return 'Equipment{id: $id, name: $name, type: $equipmentType}';
+    return 'Equipment{id: $id, name: $name, mainSiteId: $mainSiteId, subSiteId: $subSiteId}';
   }
 
   @override
