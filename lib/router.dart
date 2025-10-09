@@ -9,7 +9,9 @@ import 'screens/sites/sub_site_screen.dart';
 import 'screens/equipment/equipment_screen.dart';
 import 'screens/camera/camera_screen.dart';
 import 'screens/camera/carousel_view.dart';
+import 'screens/camera_capture_page.dart';
 import 'screens/settings/settings_screen.dart';
+import 'providers/photo_capture_provider.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/shell_scaffold.dart';
 import 'services/auth_service.dart';
@@ -44,28 +46,35 @@ class AppRouter {
       // Auth routes (without shell)
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
 
-      // Home route (with custom scaffold that includes bottom nav)
-      GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (context, state) => const _HomeScreenWrapper(),
-      ),
-
-      // Main shell with bottom nav and camera FAB
+      // Main shell with bottom nav and contextual FAB
       ShellRoute(
         builder: (context, state, child) {
           // Determine current index based on location
           int currentIndex = 0;
           final location = state.matchedLocation;
-          if (location.startsWith('/map')) {
+          if (location.startsWith('/home')) {
+            currentIndex = 0;
+          } else if (location.startsWith('/map')) {
             currentIndex = 1;
           } else if (location.startsWith('/settings')) {
             currentIndex = 2;
           }
 
-          return ShellScaffold(currentIndex: currentIndex, child: child);
+          // Home screen uses default camera FAB for now
+          // (Add Client moved to AppBar or will be handled differently)
+          return ShellScaffold(
+            currentIndex: currentIndex,
+            child: child,
+          );
         },
         routes: [
+          // Home route (now inside shell for consistent navigation)
+          GoRoute(
+            path: '/home',
+            name: 'home',
+            builder: (context, state) => const _HomeScreenContent(),
+          ),
+
           // Search (accessible via header button, no bottom nav item)
           GoRoute(
             path: '/search',
@@ -169,6 +178,18 @@ class AppRouter {
           );
         },
       ),
+
+      // Camera capture page (new field-optimized photo capture)
+      GoRoute(
+        path: '/camera-capture',
+        name: 'cameraCapture',
+        builder: (context, state) {
+          return ChangeNotifierProvider(
+            create: (_) => PhotoCaptureProvider(),
+            child: const CameraCapturePage(),
+          );
+        },
+      ),
     ],
     // Error handling for unknown routes
     errorBuilder: (context, state) => Scaffold(
@@ -195,15 +216,16 @@ class AppRouter {
   );
 }
 
-/// Wrapper for HomeScreen that provides app bar, FAB, and bottom nav
-class _HomeScreenWrapper extends StatefulWidget {
-  const _HomeScreenWrapper();
+/// Content for HomeScreen that provides app bar and FAB
+/// Bottom nav is now provided by ShellScaffold
+class _HomeScreenContent extends StatefulWidget {
+  const _HomeScreenContent();
 
   @override
-  State<_HomeScreenWrapper> createState() => _HomeScreenWrapperState();
+  State<_HomeScreenContent> createState() => _HomeScreenContentState();
 }
 
-class _HomeScreenWrapperState extends State<_HomeScreenWrapper> {
+class _HomeScreenContentState extends State<_HomeScreenContent> {
   final DatabaseService _dbService = DatabaseService();
 
   @override
@@ -216,6 +238,13 @@ class _HomeScreenWrapperState extends State<_HomeScreenWrapper> {
         title: const Text('Ziatech'),
         backgroundColor: const Color(0xFF4A90E2),
         actions: [
+          // Add Client button (moved from FAB to avoid conflict with camera FAB)
+          if (authState.hasPermission('create'))
+            IconButton(
+              icon: const Icon(Icons.person_add),
+              onPressed: () => _showAddClientDialog(context),
+              tooltip: 'Add Client',
+            ),
           // Search button
           IconButton(
             icon: const Icon(Icons.search),
@@ -268,17 +297,6 @@ class _HomeScreenWrapperState extends State<_HomeScreenWrapper> {
         ],
       ),
       body: const HomeScreen(),
-      bottomNavigationBar: const BottomNav(currentIndex: 0),
-      floatingActionButton: authState.hasPermission('create')
-          ? FloatingActionButton.extended(
-              heroTag: 'wrapper_add_client_fab',
-              onPressed: () => _showAddClientDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Client'),
-              backgroundColor: Colors.blue[700],
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 

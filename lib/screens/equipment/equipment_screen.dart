@@ -346,14 +346,18 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
 
     return FloatingActionButton(
       heroTag: 'equipment_camera_fab_${widget.equipmentId}',
-      onPressed: _openCamera,
+      onPressed: _openQuickCapture,
       backgroundColor: const Color(0xFF4A90E2),
       child: const Icon(Icons.camera_alt),
-      tooltip: 'Capture Photo',
+      tooltip: 'Quick Capture',
     );
   }
 
-  void _openCamera() {
-    context.push('/camera/${widget.equipmentId}');
+  void _openQuickCapture() async {
+    final result = await context.push('/camera-capture');
+    if (result != null && mounted) {
+      // Refresh photos after capturing
+      _loadData();
+    }
   }
 }

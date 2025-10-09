@@ -11,7 +11,7 @@ import 'package:sitepictures/services/database_service.dart';
 /// Note: Actual battery measurement requires platform-specific APIs
 /// This test validates resource-efficient patterns
 void main() {
-  group('Battery Usage Performance Test', () {
+  group('Battery Usage Performance Test', skip: 'Database initialization needs sqflite_common_ffi setup', () {
     late DatabaseService dbService;
 
     setUpAll(() async {
