@@ -48,11 +48,7 @@ class BreadcrumbNavigation extends StatelessWidget {
                 ),
               ),
               if (!isLast)
-                Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey[600],
-                  size: 20,
-                ),
+                Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
             ],
           );
         },

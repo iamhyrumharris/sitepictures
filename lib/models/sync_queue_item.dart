@@ -23,8 +23,8 @@ class SyncQueueItem {
     this.lastAttempt,
     this.error,
     this.isCompleted = false,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now();
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
@@ -34,8 +34,13 @@ class SyncQueueItem {
     if (payload.isEmpty) return false;
     if (retryCount < 0) return false;
     // Validate entityType
-    if (!['photo', 'client', 'mainsite', 'subsite', 'equipment']
-        .contains(entityType.toLowerCase())) {
+    if (![
+      'photo',
+      'client',
+      'mainsite',
+      'subsite',
+      'equipment',
+    ].contains(entityType.toLowerCase())) {
       return false;
     }
     // Validate operation

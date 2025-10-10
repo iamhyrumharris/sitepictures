@@ -5,11 +5,7 @@ class ClientListTile extends StatelessWidget {
   final Client client;
   final VoidCallback onTap;
 
-  const ClientListTile({
-    super.key,
-    required this.client,
-    required this.onTap,
-  });
+  const ClientListTile({super.key, required this.client, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +21,7 @@ class ClientListTile extends StatelessWidget {
         ),
         title: Text(
           client.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         subtitle: client.description != null
             ? Text(

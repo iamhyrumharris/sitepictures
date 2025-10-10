@@ -37,10 +37,7 @@ class PhotoThumbnailStrip extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: photo.thumbnailData != null
-                        ? Image.memory(
-                            photo.thumbnailData!,
-                            fit: BoxFit.cover,
-                          )
+                        ? Image.memory(photo.thumbnailData!, fit: BoxFit.cover)
                         : const Icon(Icons.image, color: Colors.white),
                   ),
                 ),

@@ -56,7 +56,10 @@ class AuthService {
         _currentUser = testUser;
 
         await _storage.write(key: _tokenKey, value: _token);
-        await _storage.write(key: _userKey, value: jsonEncode(testUser.toJson()));
+        await _storage.write(
+          key: _userKey,
+          value: jsonEncode(testUser.toJson()),
+        );
 
         return true;
       }

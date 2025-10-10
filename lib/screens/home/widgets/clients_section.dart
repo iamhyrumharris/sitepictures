@@ -44,9 +44,8 @@ class ClientsSection extends StatelessWidget {
                     children: [
                       Text(
                         'Clients',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       if (appState.currentUser?.role == UserRole.admin ||
                           appState.currentUser?.role == UserRole.technician)
@@ -82,24 +81,20 @@ class ClientsSection extends StatelessWidget {
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          Icon(
-            Icons.business,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.business, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No Clients Yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
             'Add your first client to get started',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[500],
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -118,24 +113,20 @@ class ClientsSection extends StatelessWidget {
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red[400],
-          ),
+          Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
           const SizedBox(height: 16),
           Text(
             'Error Loading Clients',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.red[600],
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.red[600]),
           ),
           const SizedBox(height: 8),
           Text(
             error,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
             textAlign: TextAlign.center,
           ),
         ],

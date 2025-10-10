@@ -34,7 +34,9 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               title: Text(user.name),
-              subtitle: Text('${user.email}\nRole: ${user.role.toString().split('.').last}'),
+              subtitle: Text(
+                '${user.email}\nRole: ${user.role.toString().split('.').last}',
+              ),
               isThreeLine: true,
             ),
             const Divider(),
@@ -46,21 +48,21 @@ class SettingsScreen extends StatelessWidget {
               syncState.isSyncing
                   ? Icons.sync
                   : syncState.pendingItems > 0
-                      ? Icons.cloud_off
-                      : Icons.cloud_done,
+                  ? Icons.cloud_off
+                  : Icons.cloud_done,
               color: syncState.isSyncing
                   ? Colors.blue
                   : syncState.pendingItems > 0
-                      ? Colors.orange
-                      : Colors.green,
+                  ? Colors.orange
+                  : Colors.green,
             ),
             title: const Text('Sync Status'),
             subtitle: Text(
               syncState.isSyncing
                   ? 'Syncing...'
                   : syncState.pendingItems > 0
-                      ? '${syncState.pendingItems} items pending'
-                      : 'All synced',
+                  ? '${syncState.pendingItems} items pending'
+                  : 'All synced',
             ),
             trailing: syncState.pendingItems > 0
                 ? TextButton(

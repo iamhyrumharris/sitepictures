@@ -6,10 +6,7 @@ import 'package:go_router/go_router.dart';
 class BottomNav extends StatelessWidget {
   final int currentIndex;
 
-  const BottomNav({
-    Key? key,
-    required this.currentIndex,
-  }) : super(key: key);
+  const BottomNav({Key? key, required this.currentIndex}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

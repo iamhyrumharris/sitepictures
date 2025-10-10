@@ -29,8 +29,10 @@ class RecentLocation {
     if (displayName.isEmpty) return false;
     if (navigationPath.isEmpty) return false;
     // At least one location ID must be non-null
-    if (clientId == null && mainSiteId == null &&
-        subSiteId == null && equipmentId == null) {
+    if (clientId == null &&
+        mainSiteId == null &&
+        subSiteId == null &&
+        equipmentId == null) {
       return false;
     }
     return true;

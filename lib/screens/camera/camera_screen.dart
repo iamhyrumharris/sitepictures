@@ -221,7 +221,9 @@ class _CameraScreenState extends State<CameraScreen> {
       }
 
       // FR-020, FR-021: Check photo limit before capture
-      final limitCheck = await cameraService.checkPhotoLimit(widget.equipmentId);
+      final limitCheck = await cameraService.checkPhotoLimit(
+        widget.equipmentId,
+      );
 
       if (limitCheck['atLimit'] == true) {
         if (!mounted) return;
@@ -278,10 +280,7 @@ class _CameraScreenState extends State<CameraScreen> {
       setState(() => _isCapturing = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -299,9 +298,9 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _quickSave(int index) async {
     // Individual photo save logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Photo saved')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Photo saved')));
   }
 
   void _finishCapture() {

@@ -23,9 +23,9 @@ class MainSite {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
@@ -159,9 +159,9 @@ class SubSite {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
@@ -228,11 +228,7 @@ class SubSite {
   }
 
   // Create copy with updates
-  SubSite copyWith({
-    String? name,
-    String? description,
-    bool? isActive,
-  }) {
+  SubSite copyWith({String? name, String? description, bool? isActive}) {
     return SubSite(
       id: id,
       mainSiteId: mainSiteId,

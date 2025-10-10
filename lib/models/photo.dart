@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'folder_photo.dart';
 
 class Photo {
   final String id;
@@ -15,6 +16,11 @@ class Photo {
   final String? remoteUrl;
   final DateTime createdAt;
 
+  // Virtual fields (not stored in database, derived from JOIN queries)
+  final String? folderId;
+  final String? folderName;
+  final BeforeAfter? beforeAfter;
+
   Photo({
     String? id,
     required this.equipmentId,
@@ -29,8 +35,12 @@ class Photo {
     this.syncedAt,
     this.remoteUrl,
     DateTime? createdAt,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now();
+    // Virtual fields
+    this.folderId,
+    this.folderName,
+    this.beforeAfter,
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
@@ -78,7 +88,15 @@ class Photo {
       isSynced: map['is_synced'] == 1,
       syncedAt: map['synced_at'],
       remoteUrl: map['remote_url'],
-      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : DateTime.now(),
+      // Virtual fields from JOIN queries
+      folderId: map['folder_id'],
+      folderName: map['folder_name'],
+      beforeAfter: map['before_after'] != null
+          ? BeforeAfter.fromDb(map['before_after'])
+          : null,
     );
   }
 
@@ -87,7 +105,9 @@ class Photo {
     return Photo(
       id: json['id'],
       equipmentId: json['equipmentId'],
-      filePath: json['remoteUrl'] ?? 'remote://${json['id']}',  // Use remote URL or placeholder for synced photos
+      filePath:
+          json['remoteUrl'] ??
+          'remote://${json['id']}', // Use remote URL or placeholder for synced photos
       thumbnailPath: null,
       latitude: json['latitude'].toDouble(),
       longitude: json['longitude'].toDouble(),
@@ -123,6 +143,9 @@ class Photo {
     bool? isSynced,
     String? syncedAt,
     String? remoteUrl,
+    String? folderId,
+    String? folderName,
+    BeforeAfter? beforeAfter,
   }) {
     return Photo(
       id: id,
@@ -137,6 +160,10 @@ class Photo {
       isSynced: isSynced ?? this.isSynced,
       syncedAt: syncedAt ?? this.syncedAt,
       remoteUrl: remoteUrl ?? this.remoteUrl,
+      // Virtual fields
+      folderId: folderId ?? this.folderId,
+      folderName: folderName ?? this.folderName,
+      beforeAfter: beforeAfter ?? this.beforeAfter,
     );
   }
 

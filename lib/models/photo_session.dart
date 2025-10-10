@@ -25,8 +25,10 @@ class TempPhoto {
     this.thumbnailData,
   }) {
     if (id.isEmpty) throw ArgumentError('TempPhoto id cannot be empty');
-    if (filePath.isEmpty) throw ArgumentError('TempPhoto filePath cannot be empty');
-    if (displayOrder < 0) throw ArgumentError('TempPhoto displayOrder must be >= 0');
+    if (filePath.isEmpty)
+      throw ArgumentError('TempPhoto filePath cannot be empty');
+    if (displayOrder < 0)
+      throw ArgumentError('TempPhoto displayOrder must be >= 0');
     if (captureTimestamp.isAfter(DateTime.now())) {
       throw ArgumentError('TempPhoto captureTimestamp cannot be in the future');
     }
@@ -34,20 +36,20 @@ class TempPhoto {
 
   /// Serialize to JSON for session preservation (FR-029/FR-030)
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'filePath': filePath,
-        'captureTimestamp': captureTimestamp.toIso8601String(),
-        'displayOrder': displayOrder,
-      };
+    'id': id,
+    'filePath': filePath,
+    'captureTimestamp': captureTimestamp.toIso8601String(),
+    'displayOrder': displayOrder,
+  };
 
   /// Deserialize from JSON for session restoration
   factory TempPhoto.fromJson(Map<String, dynamic> json) => TempPhoto(
-        id: json['id'] as String,
-        filePath: json['filePath'] as String,
-        captureTimestamp: DateTime.parse(json['captureTimestamp'] as String),
-        displayOrder: json['displayOrder'] as int,
-        thumbnailData: null, // Regenerate after restore
-      );
+    id: json['id'] as String,
+    filePath: json['filePath'] as String,
+    captureTimestamp: DateTime.parse(json['captureTimestamp'] as String),
+    displayOrder: json['displayOrder'] as int,
+    thumbnailData: null, // Regenerate after restore
+  );
 
   TempPhoto copyWith({
     String? id,
@@ -68,9 +70,9 @@ class TempPhoto {
 
 /// Session status enum
 enum SessionStatus {
-  inProgress,  // Active capture session
-  completed,   // User pressed Done + selected Next/Quick Save
-  cancelled,   // User pressed Cancel and confirmed
+  inProgress, // Active capture session
+  completed, // User pressed Done + selected Next/Quick Save
+  cancelled, // User pressed Cancel and confirmed
 }
 
 /// Exception thrown when trying to add photo beyond 20-photo limit
@@ -111,11 +113,13 @@ class PhotoSession {
     List<TempPhoto>? photos,
     DateTime? startTime,
     this.status = SessionStatus.inProgress,
-  })  : photos = photos ?? [],
-        startTime = startTime ?? DateTime.now() {
+  }) : photos = photos ?? [],
+       startTime = startTime ?? DateTime.now() {
     if (id.isEmpty) throw ArgumentError('PhotoSession id cannot be empty');
     if (this.photos.length > maxPhotos) {
-      throw ArgumentError('PhotoSession cannot have more than $maxPhotos photos');
+      throw ArgumentError(
+        'PhotoSession cannot have more than $maxPhotos photos',
+      );
     }
   }
 
@@ -142,7 +146,9 @@ class PhotoSession {
   /// Remove photo from session (FR-010)
   void removePhoto(String photoId) {
     if (status != SessionStatus.inProgress) {
-      throw InvalidSessionStateException('Cannot remove photo from $status session');
+      throw InvalidSessionStateException(
+        'Cannot remove photo from $status session',
+      );
     }
     photos.removeWhere((p) => p.id == photoId);
     _reindexDisplayOrder(); // Maintain sequential ordering
@@ -151,7 +157,9 @@ class PhotoSession {
   /// Complete session (FR-013, FR-014, FR-015)
   void complete() {
     if (status != SessionStatus.inProgress) {
-      throw InvalidSessionStateException('Can only complete inProgress session');
+      throw InvalidSessionStateException(
+        'Can only complete inProgress session',
+      );
     }
     status = SessionStatus.completed;
   }
@@ -173,11 +181,11 @@ class PhotoSession {
 
   /// Serialize to JSON for session preservation (FR-029/FR-030)
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'photos': photos.map((p) => p.toJson()).toList(),
-        'startTime': startTime.toIso8601String(),
-        'status': status.name,
-      };
+    'id': id,
+    'photos': photos.map((p) => p.toJson()).toList(),
+    'startTime': startTime.toIso8601String(),
+    'status': status.name,
+  };
 
   /// Deserialize from JSON for session restoration
   factory PhotoSession.fromJson(Map<String, dynamic> json) {

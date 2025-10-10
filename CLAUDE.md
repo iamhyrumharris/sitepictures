@@ -8,6 +8,8 @@ Auto-generated from all feature plans. Last updated: 2025-09-28
 - SQLite via sqflite for local storage, file system for photo caching (002-i-want-to)
 - Dart 3.x / Flutter SDK 3.24+ + camera (live preview & capture), path_provider (temp storage), permission_handler (runtime permissions), provider (state management), flutter_image_compress (optional thumbnail optimization) (003-specify-feature-work)
 - Temporary local file system (path_provider's getTemporaryDirectory), future integration with SQLite for permanent storage (003-specify-feature-work)
+- Dart 3.8.1 / Flutter SDK 3.24+ + sqflite (SQLite), provider (state management), camera, go_router, uuid (004-i-want-to)
+- SQLite database with existing `photos` table, new `photo_folders` and `folder_photos` junction table (004-i-want-to)
 
 ## Project Structure
 ```
@@ -22,9 +24,9 @@ tests/
 Flutter/Dart 3.x for cross-platform developmen: Follow standard conventions
 
 ## Recent Changes
+- 004-i-want-to: Added Dart 3.8.1 / Flutter SDK 3.24+ + sqflite (SQLite), provider (state management), camera, go_router, uuid
 - 003-specify-feature-work: Added Dart 3.x / Flutter SDK 3.24+ + camera (live preview & capture), path_provider (temp storage), permission_handler (runtime permissions), provider (state management), flutter_image_compress (optional thumbnail optimization)
 - 002-i-want-to: Added Dart 3.x / Flutter SDK 3.24+ + Flutter Framework, sqflite (SQLite), geolocator, camera, http, provider (state management)
-- 001-build-an-industrial: Added Flutter/Dart 3.x for cross-platform developmen + Flutter SDK, SQLite (sqflite), geolocator, camera, http (for sync)
 
 ## Implementation Notes: Camera Capture Feature (003-specify-feature-work)
 

@@ -25,13 +25,13 @@ class Equipment {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
-  })  : assert(
-          (mainSiteId != null) != (subSiteId != null),
-          'Equipment must belong to exactly one of MainSite or SubSite (XOR constraint)',
-        ),
-        id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : assert(
+         (mainSiteId != null) != (subSiteId != null),
+         'Equipment must belong to exactly one of MainSite or SubSite (XOR constraint)',
+       ),
+       id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   // Validation
   bool isValid() {

@@ -200,7 +200,10 @@ class CameraService {
   }
 
   // Load photo thumbnail (optimized)
-  Future<Uint8List> loadPhotoThumbnail(String filePath, {int width = 200}) async {
+  Future<Uint8List> loadPhotoThumbnail(
+    String filePath, {
+    int width = 200,
+  }) async {
     final thumbnailPath = _getThumbnailPath(filePath);
     final thumbnailFile = File(thumbnailPath);
 
@@ -221,7 +224,9 @@ class CameraService {
   }
 
   // Generate thumbnail (runs in isolate)
-  static Future<Uint8List> _generateThumbnail(Map<String, dynamic> params) async {
+  static Future<Uint8List> _generateThumbnail(
+    Map<String, dynamic> params,
+  ) async {
     final bytes = params['bytes'] as Uint8List;
     final width = params['width'] as int;
     final thumbnailPath = params['path'] as String;

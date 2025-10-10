@@ -34,20 +34,14 @@ class RecentLocationCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 location.navigationPath,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(
                 _formatAccessTime(location.accessedAt),
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: Colors.grey[500], fontSize: 11),
               ),
             ],
           ),

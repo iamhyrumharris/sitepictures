@@ -17,9 +17,9 @@ class Client {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
@@ -84,11 +84,7 @@ class Client {
   }
 
   // Create copy with updates
-  Client copyWith({
-    String? name,
-    String? description,
-    bool? isActive,
-  }) {
+  Client copyWith({String? name, String? description, bool? isActive}) {
     return Client(
       id: id,
       name: name ?? this.name,

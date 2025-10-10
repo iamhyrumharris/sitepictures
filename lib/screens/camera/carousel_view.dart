@@ -40,7 +40,9 @@ class _PhotoCarouselViewState extends State<PhotoCarouselView> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('Photo ${_currentIndex + 1} of ${widget.photoPaths.length}'),
+        title: Text(
+          'Photo ${_currentIndex + 1} of ${widget.photoPaths.length}',
+        ),
         backgroundColor: Colors.black,
         actions: [
           IconButton(
@@ -118,7 +120,9 @@ class _PhotoCarouselViewState extends State<PhotoCarouselView> {
           const SizedBox(width: 16),
           // Next button (FR-010)
           ElevatedButton.icon(
-            onPressed: _currentIndex < widget.photoPaths.length - 1 ? _nextPhoto : null,
+            onPressed: _currentIndex < widget.photoPaths.length - 1
+                ? _nextPhoto
+                : null,
             icon: const Icon(Icons.arrow_forward),
             label: const Text('Next'),
             style: ElevatedButton.styleFrom(
@@ -196,9 +200,9 @@ class _PhotoCarouselViewState extends State<PhotoCarouselView> {
                 }
               });
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Photo deleted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Photo deleted')));
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),

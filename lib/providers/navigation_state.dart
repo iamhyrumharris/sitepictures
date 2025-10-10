@@ -7,7 +7,8 @@ class NavigationState extends ChangeNotifier {
   int _selectedBottomNavIndex = 0;
 
   List<BreadcrumbItem> get breadcrumbs => List.unmodifiable(_breadcrumbs);
-  List<RecentLocation> get recentLocations => List.unmodifiable(_recentLocations);
+  List<RecentLocation> get recentLocations =>
+      List.unmodifiable(_recentLocations);
   int get selectedBottomNavIndex => _selectedBottomNavIndex;
 
   void setBottomNavIndex(int index) {
@@ -82,7 +83,11 @@ class NavigationState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void navigateToEquipment(String equipmentId, String parentId, String clientId) {
+  void navigateToEquipment(
+    String equipmentId,
+    String parentId,
+    String clientId,
+  ) {
     notifyListeners();
   }
 }
@@ -92,9 +97,5 @@ class BreadcrumbItem {
   final String title;
   final String route;
 
-  BreadcrumbItem({
-    required this.id,
-    required this.title,
-    required this.route,
-  });
+  BreadcrumbItem({required this.id, required this.title, required this.route});
 }

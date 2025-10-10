@@ -6,10 +6,17 @@ import '../providers/photo_capture_provider.dart';
 import '../widgets/camera_preview_overlay.dart';
 import '../widgets/photo_thumbnail_strip.dart';
 import '../widgets/capture_button.dart';
+import '../models/folder_photo.dart';
+import '../services/folder_service.dart';
 
 /// Main camera capture screen for work site photo documentation
+/// Supports optional folder context for before/after photo categorization
 class CameraCapturePage extends StatefulWidget {
-  const CameraCapturePage({Key? key}) : super(key: key);
+  final String? folderId;
+  final BeforeAfter? beforeAfter;
+
+  const CameraCapturePage({Key? key, this.folderId, this.beforeAfter})
+    : super(key: key);
 
   @override
   State<CameraCapturePage> createState() => _CameraCapturePageState();
@@ -79,7 +86,8 @@ class _CameraCapturePageState extends State<CameraCapturePage>
       builder: (context) => AlertDialog(
         title: const Text('Discard Photos?'),
         content: Text(
-            'You have ${provider.photoCount} unsaved photo(s). Discard them?'),
+          'You have ${provider.photoCount} unsaved photo(s). Discard them?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -144,6 +152,23 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     );
 
     if (result != null) {
+      // If capturing in folder context, associate photos with folder
+      if (widget.folderId != null && widget.beforeAfter != null) {
+        final folderService = FolderService();
+        for (final photo in provider.session.photos) {
+          try {
+            await folderService.addPhotoToFolder(
+              folderId: widget.folderId!,
+              photoId: photo.id,
+              beforeAfter: widget.beforeAfter!,
+            );
+          } catch (e) {
+            // Log error but don't fail the entire operation
+            debugPrint('Error associating photo ${photo.id} with folder: $e');
+          }
+        }
+      }
+
       provider.completeSession();
       // FR-016, FR-017: Placeholder - return photos to caller
       if (mounted) {
@@ -213,9 +238,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
           return Stack(
             children: [
               // FR-006: Camera preview as bottom layer
-              Positioned.fill(
-                child: CameraPreview(controller),
-              ),
+              Positioned.fill(child: CameraPreview(controller)),
 
               // FR-002, FR-003: Top overlay with Cancel and Done
               CameraPreviewOverlay(

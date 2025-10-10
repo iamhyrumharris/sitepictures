@@ -9,11 +9,11 @@ import '../services/photo_storage_service.dart';
 
 /// Camera status enum
 enum CameraStatus {
-  uninitialized,     // Camera controller not yet created
-  initializing,      // Camera initialization in progress
-  ready,             // Camera ready for preview and capture
-  permissionDenied,  // User denied camera permission (FR-022)
-  error,             // Camera hardware or initialization error (FR-024)
+  uninitialized, // Camera controller not yet created
+  initializing, // Camera initialization in progress
+  ready, // Camera ready for preview and capture
+  permissionDenied, // User denied camera permission (FR-022)
+  error, // Camera hardware or initialization error (FR-024)
 }
 
 /// Provider for managing photo capture session state
@@ -70,7 +70,8 @@ class PhotoCaptureProvider extends ChangeNotifier {
         // Check if permanently denied (need to go to settings)
         if (status.isPermanentlyDenied) {
           _cameraStatus = CameraStatus.permissionDenied;
-          _errorMessage = 'Camera permission denied. Please enable in settings.';
+          _errorMessage =
+              'Camera permission denied. Please enable in settings.';
           _isInitializing = false;
           notifyListeners();
           return;
@@ -117,8 +118,10 @@ class PhotoCaptureProvider extends ChangeNotifier {
       final xFile = await _cameraService.controller!.takePicture();
 
       // Save to temp storage
-      final tempPhoto =
-          await _storageService.saveTempPhoto(xFile, _session.photoCount);
+      final tempPhoto = await _storageService.saveTempPhoto(
+        xFile,
+        _session.photoCount,
+      );
 
       // Add to session
       _session.addPhoto(tempPhoto);
@@ -175,8 +178,9 @@ class PhotoCaptureProvider extends ChangeNotifier {
         for (int i = 0; i < _session.photos.length; i++) {
           final photo = _session.photos[i];
           if (photo.thumbnailData == null) {
-            final thumbnail =
-                await _storageService.regenerateThumbnail(photo.filePath);
+            final thumbnail = await _storageService.regenerateThumbnail(
+              photo.filePath,
+            );
             _session.photos[i] = photo.copyWith(thumbnailData: thumbnail);
           }
         }

@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/equipment.dart';
-import '../../models/photo.dart';
 import '../../models/user.dart';
 import '../../models/client.dart';
 import '../../models/site.dart';
 import '../../providers/app_state.dart';
 import '../../providers/auth_state.dart';
 import '../../providers/navigation_state.dart' as nav_state;
+import '../../providers/folder_provider.dart';
 import '../../widgets/breadcrumb_navigation.dart';
+import '../../widgets/create_folder_dialog.dart';
 import '../../services/recent_locations_service.dart';
+import 'all_photos_tab.dart';
+import 'folders_tab.dart';
 
 /// Equipment screen showing photos
-/// Implements FR-007, FR-009
+/// Implements FR-001, FR-002 (tab navigation), FR-007, FR-009
 class EquipmentScreen extends StatefulWidget {
   final String equipmentId;
 
@@ -24,19 +27,30 @@ class EquipmentScreen extends StatefulWidget {
   State<EquipmentScreen> createState() => _EquipmentScreenState();
 }
 
-class _EquipmentScreenState extends State<EquipmentScreen> {
+class _EquipmentScreenState extends State<EquipmentScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   Client? _client;
   MainSite? _mainSite;
   SubSite? _subSite;
   Equipment? _equipment;
-  List<Photo> _photos = [];
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild to update FAB visibility
+    });
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -49,7 +63,6 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       final appState = context.read<AppState>();
       final authState = context.read<AuthState>();
       final equipment = await appState.getEquipment(widget.equipmentId);
-      final photos = await appState.getPhotos(widget.equipmentId);
 
       // Load hierarchy based on equipment location
       Client? client;
@@ -78,7 +91,6 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
         _mainSite = mainSite;
         _subSite = subSite;
         _equipment = equipment;
-        _photos = photos;
         _isLoading = false;
       });
 
@@ -114,6 +126,15 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       appBar: AppBar(
         title: const Text('Site Pictures'),
         backgroundColor: const Color(0xFF4A90E2),
+        bottom: _equipment != null
+            ? TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'All Photos'),
+                  Tab(text: 'Folders'),
+                ],
+              )
+            : null,
       ),
       body: Column(
         children: [
@@ -201,141 +222,69 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       );
     }
 
-    if (_photos.isEmpty) {
-      return _buildEmptyState();
+    if (_equipment == null) {
+      return const Center(child: Text('Equipment not found'));
     }
 
-    return Column(
+    return TabBarView(
+      controller: _tabController,
       children: [
-        // FR-021: Photo count warning
-        if (_photos.length >= 90) _buildPhotoLimitWarning(),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _loadData,
-            child: GridView.builder(
-              padding: const EdgeInsets.all(8.0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8.0,
-                mainAxisSpacing: 8.0,
-              ),
-              itemCount: _photos.length,
-              itemBuilder: (context, index) =>
-                  _buildPhotoTile(_photos[index], index),
-            ),
-          ),
-        ),
+        AllPhotosTab(equipmentId: widget.equipmentId),
+        FoldersTab(equipmentId: widget.equipmentId),
       ],
     );
   }
 
-  // FR-021: Photo limit warning banner
-  Widget _buildPhotoLimitWarning() {
-    final count = _photos.length;
-    final isAtLimit = count >= 100;
+  Future<void> _createFolder() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => const CreateFolderDialog(),
+    );
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12.0),
-      color: isAtLimit ? Colors.red[100] : Colors.orange[100],
-      child: Row(
-        children: [
-          Icon(
-            isAtLimit ? Icons.error : Icons.warning,
-            color: isAtLimit ? Colors.red[900] : Colors.orange[900],
+    if (result != null && mounted) {
+      debugPrint('Creating folder with work order: $result');
+
+      final appState = context.read<AppState>();
+      final folderProvider = context.read<FolderProvider>();
+      final authState = context.read<AuthState>();
+
+      // Ensure AppState has the current user
+      if (authState.currentUser != null) {
+        appState.setCurrentUser(authState.currentUser);
+        debugPrint('Set current user in AppState: ${authState.currentUser!.email}');
+      } else {
+        debugPrint('ERROR: No current user in AuthState!');
+      }
+
+      final folder = await appState.createFolder(
+        equipmentId: widget.equipmentId,
+        workOrder: result,
+      );
+
+      debugPrint('Folder created: ${folder?.id} - ${folder?.name}');
+
+      if (folder != null) {
+        // Reload folders in the provider
+        await folderProvider.loadFolders(widget.equipmentId);
+
+        debugPrint('Folders reloaded: ${folderProvider.folders.length} folders');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Folder created: ${folder.name}')),
+          );
+        }
+      } else if (mounted) {
+        final error = appState.errorMessage ?? 'Unknown error';
+        debugPrint('Failed to create folder: $error');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create folder: $error'),
+            backgroundColor: Colors.red,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              isAtLimit
-                  ? 'Photo limit reached (100/100). Cannot capture more photos.'
-                  : 'Warning: $count/100 photos. Approaching limit.',
-              style: TextStyle(
-                color: isAtLimit ? Colors.red[900] : Colors.orange[900],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_camera, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No Photos Yet',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap the camera button to capture photos',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhotoTile(Photo photo, int index) {
-    return GestureDetector(
-      onTap: () => _openCarousel(index),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // TODO: Load actual image from photo.filePath
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            child: const Icon(Icons.image, size: 48, color: Colors.grey),
-          ),
-          if (!photo.isSynced)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Container(
-                padding: const EdgeInsets.all(4.0),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: const Icon(
-                  Icons.cloud_off,
-                  size: 16,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _openCarousel(int initialIndex) {
-    final photoPaths = _photos.map((p) => p.filePath).toList();
-    context.push(
-      '/carousel',
-      extra: {
-        'photos': photoPaths,
-        'initialIndex': initialIndex,
-        'equipmentId': widget.equipmentId,
-      },
-    );
+        );
+      }
+    }
   }
 
   Widget? _buildFAB() {
@@ -344,20 +293,34 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       return null;
     }
 
-    return FloatingActionButton(
-      heroTag: 'equipment_camera_fab_${widget.equipmentId}',
-      onPressed: _openQuickCapture,
-      backgroundColor: const Color(0xFF4A90E2),
-      child: const Icon(Icons.camera_alt),
-      tooltip: 'Quick Capture',
-    );
+    // Show different FAB based on active tab
+    if (_tabController.index == 0) {
+      // All Photos tab - show camera FAB
+      return FloatingActionButton(
+        heroTag: 'equipment_camera_fab_${widget.equipmentId}',
+        onPressed: _openQuickCapture,
+        backgroundColor: const Color(0xFF4A90E2),
+        child: const Icon(Icons.camera_alt),
+        tooltip: 'Quick Capture',
+      );
+    } else if (_tabController.index == 1) {
+      // Folders tab - show create folder FAB
+      return FloatingActionButton.extended(
+        heroTag: 'create_folder_fab_${widget.equipmentId}',
+        onPressed: _createFolder,
+        backgroundColor: const Color(0xFF4A90E2),
+        icon: const Icon(Icons.add),
+        label: const Text('Create Folder'),
+      );
+    }
+
+    return null;
   }
 
   void _openQuickCapture() async {
     final result = await context.push('/camera-capture');
     if (result != null && mounted) {
-      // Refresh photos after capturing
-      _loadData();
+      // Tabs will handle their own refresh via providers
     }
   }
 }

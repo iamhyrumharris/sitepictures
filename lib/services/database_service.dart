@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -175,38 +175,97 @@ class DatabaseService {
   Future<void> _createIndexes(Database db) async {
     // Frequent queries indexes
     await db.execute(
-        'CREATE INDEX idx_mainsite_client ON main_sites(client_id, is_active)');
+      'CREATE INDEX idx_mainsite_client ON main_sites(client_id, is_active)',
+    );
     await db.execute(
-        'CREATE INDEX idx_subsite_mainsite ON sub_sites(main_site_id, is_active)');
+      'CREATE INDEX idx_subsite_mainsite ON sub_sites(main_site_id, is_active)',
+    );
     await db.execute(
-        'CREATE INDEX idx_equipment_mainsite ON equipment(main_site_id, is_active)');
+      'CREATE INDEX idx_equipment_mainsite ON equipment(main_site_id, is_active)',
+    );
     await db.execute(
-        'CREATE INDEX idx_equipment_subsite ON equipment(sub_site_id, is_active)');
+      'CREATE INDEX idx_equipment_subsite ON equipment(sub_site_id, is_active)',
+    );
     await db.execute(
-        'CREATE INDEX idx_photo_equipment ON photos(equipment_id, timestamp DESC)');
+      'CREATE INDEX idx_photo_equipment ON photos(equipment_id, timestamp DESC)',
+    );
     await db.execute(
-        'CREATE INDEX idx_photo_sync ON photos(is_synced, created_at)');
+      'CREATE INDEX idx_photo_sync ON photos(is_synced, created_at)',
+    );
 
     // Recent locations indexes
     await db.execute(
-        'CREATE INDEX idx_recent_user ON recent_locations(user_id, accessed_at DESC)');
+      'CREATE INDEX idx_recent_user ON recent_locations(user_id, accessed_at DESC)',
+    );
 
     // Sync queue indexes
     await db.execute(
-        'CREATE INDEX idx_sync_pending ON sync_queue(is_completed, created_at)');
+      'CREATE INDEX idx_sync_pending ON sync_queue(is_completed, created_at)',
+    );
     await db.execute(
-        'CREATE INDEX idx_sync_entity ON sync_queue(entity_type, entity_id)');
+      'CREATE INDEX idx_sync_entity ON sync_queue(entity_type, entity_id)',
+    );
 
     // Client name uniqueness
     await db.execute('CREATE UNIQUE INDEX idx_client_name ON clients(name)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Future migrations will be handled here
-    // Example:
-    // if (oldVersion < 2) {
-    //   await db.execute('ALTER TABLE ...');
-    // }
+    // Migration 002: Add photo folders feature
+    if (oldVersion < 2) {
+      await _migration002(db);
+    }
+  }
+
+  Future<void> _migration002(Database db) async {
+    // Migration 002: Photo Folders
+    // Feature: 004-i-want-to
+    // Date: 2025-10-09
+
+    // Create photo_folders table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS photo_folders (
+        id TEXT PRIMARY KEY,
+        equipment_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        work_order TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_photo_folders_equipment ON photo_folders(equipment_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photo_folders_created_at ON photo_folders(created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photo_folders_equipment_created ON photo_folders(equipment_id, created_at DESC)',
+    );
+
+    // Create folder_photos junction table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS folder_photos (
+        folder_id TEXT NOT NULL,
+        photo_id TEXT NOT NULL,
+        before_after TEXT NOT NULL CHECK(before_after IN ('before', 'after')),
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (folder_id, photo_id),
+        FOREIGN KEY (folder_id) REFERENCES photo_folders(id) ON DELETE CASCADE,
+        FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_folder_photos_folder ON folder_photos(folder_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_folder_photos_photo ON folder_photos(photo_id)',
+    );
   }
 
   // Transaction support
@@ -217,7 +276,8 @@ class DatabaseService {
 
   // Batch operations support
   Future<List<Object?>> batch(
-      Future<void> Function(Batch batch) operations) async {
+    Future<void> Function(Batch batch) operations,
+  ) async {
     final db = await database;
     final batch = db.batch();
     await operations(batch);
@@ -248,5 +308,85 @@ class DatabaseService {
   Future<String> getDatabasePath() async {
     final databasePath = await getDatabasesPath();
     return join(databasePath, 'sitepictures.db');
+  }
+
+  // ===== Folder Query Methods (T003) =====
+
+  /// Get all folders for an equipment item
+  Future<List<Map<String, dynamic>>> getFoldersForEquipment(
+    String equipmentId,
+  ) async {
+    final db = await database;
+    return await db.query(
+      'photo_folders',
+      where: 'equipment_id = ? AND is_deleted = 0',
+      whereArgs: [equipmentId],
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  /// Get a single folder by ID
+  Future<Map<String, dynamic>?> getFolderById(String folderId) async {
+    final db = await database;
+    final results = await db.query(
+      'photo_folders',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [folderId],
+      limit: 1,
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  /// Get before photos for a folder
+  Future<List<Map<String, dynamic>>> getBeforePhotos(String folderId) async {
+    final db = await database;
+    return await db.rawQuery(
+      '''
+      SELECT p.*
+      FROM photos p
+      JOIN folder_photos fp ON p.id = fp.photo_id
+      WHERE fp.folder_id = ? AND fp.before_after = 'before'
+      ORDER BY p.timestamp DESC
+    ''',
+      [folderId],
+    );
+  }
+
+  /// Get after photos for a folder
+  Future<List<Map<String, dynamic>>> getAfterPhotos(String folderId) async {
+    final db = await database;
+    return await db.rawQuery(
+      '''
+      SELECT p.*
+      FROM photos p
+      JOIN folder_photos fp ON p.id = fp.photo_id
+      WHERE fp.folder_id = ? AND fp.before_after = 'after'
+      ORDER BY p.timestamp DESC
+    ''',
+      [folderId],
+    );
+  }
+
+  /// Get all photos with folder information for an equipment item
+  Future<List<Map<String, dynamic>>> getAllPhotosWithFolderInfo(
+    String equipmentId,
+  ) async {
+    final db = await database;
+    return await db.rawQuery(
+      '''
+      SELECT
+        p.*,
+        fp.folder_id AS folder_id,
+        pf.name AS folder_name,
+        fp.before_after AS before_after
+      FROM photos p
+      LEFT JOIN folder_photos fp ON p.id = fp.photo_id
+      LEFT JOIN photo_folders pf ON fp.folder_id = pf.id
+      WHERE p.equipment_id = ?
+        AND (pf.is_deleted IS NULL OR pf.is_deleted = 0)
+      ORDER BY p.timestamp DESC
+    ''',
+      [equipmentId],
+    );
   }
 }

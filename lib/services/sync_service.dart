@@ -128,7 +128,9 @@ class SyncService {
         break;
     }
 
-    if (response != null && response.statusCode >= 200 && response.statusCode < 300) {
+    if (response != null &&
+        response.statusCode >= 200 &&
+        response.statusCode < 300) {
       await _markSyncComplete(item);
     } else {
       throw Exception('Sync failed with status ${response?.statusCode}');
@@ -136,7 +138,9 @@ class SyncService {
   }
 
   Future<http.Response> _syncPhoto(
-      SyncQueueItem item, Map<String, dynamic> payload) async {
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
     if (item.operation == 'create') {
       final filePath = payload['filePath'] as String;
       final file = File(filePath);
@@ -163,7 +167,9 @@ class SyncService {
   }
 
   Future<http.Response> _syncClient(
-      SyncQueueItem item, Map<String, dynamic> payload) async {
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
     switch (item.operation) {
       case 'create':
         return await _apiService.post('/clients', payload);
@@ -177,11 +183,15 @@ class SyncService {
   }
 
   Future<http.Response> _syncMainSite(
-      SyncQueueItem item, Map<String, dynamic> payload) async {
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
     switch (item.operation) {
       case 'create':
         return await _apiService.post(
-            '/clients/${payload['clientId']}/sites', payload);
+          '/clients/${payload['clientId']}/sites',
+          payload,
+        );
       case 'update':
         return await _apiService.put('/sites/${item.entityId}', payload);
       case 'delete':
@@ -192,11 +202,15 @@ class SyncService {
   }
 
   Future<http.Response> _syncSubSite(
-      SyncQueueItem item, Map<String, dynamic> payload) async {
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
     switch (item.operation) {
       case 'create':
         return await _apiService.post(
-            '/sites/${payload['mainSiteId']}/subsites', payload);
+          '/sites/${payload['mainSiteId']}/subsites',
+          payload,
+        );
       case 'update':
         return await _apiService.put('/subsites/${item.entityId}', payload);
       case 'delete':
@@ -207,7 +221,9 @@ class SyncService {
   }
 
   Future<http.Response> _syncEquipment(
-      SyncQueueItem item, Map<String, dynamic> payload) async {
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
     switch (item.operation) {
       case 'create':
         return await _apiService.post('/equipment', payload);
@@ -224,10 +240,7 @@ class SyncService {
     final db = await _dbService.database;
     await db.update(
       'sync_queue',
-      {
-        'is_completed': 1,
-        'last_attempt': DateTime.now().toIso8601String(),
-      },
+      {'is_completed': 1, 'last_attempt': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [item.id],
     );

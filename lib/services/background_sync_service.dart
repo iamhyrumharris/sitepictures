@@ -15,10 +15,7 @@ class BackgroundSyncService {
       return;
     }
 
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: false,
-    );
+    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
     // Register one-off sync task (will reschedule itself on completion)
     await Workmanager().registerOneOffTask(
@@ -33,10 +30,7 @@ class BackgroundSyncService {
   }
 
   static Future<void> triggerImmediateSync() async {
-    await Workmanager().registerOneOffTask(
-      'immediate_sync',
-      syncTaskName,
-    );
+    await Workmanager().registerOneOffTask('immediate_sync', syncTaskName);
   }
 }
 

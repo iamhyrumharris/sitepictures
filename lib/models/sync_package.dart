@@ -1,27 +1,11 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
-enum EntityType {
-  photo,
-  client,
-  site,
-  equipment,
-  revision,
-  gpsBoundary,
-}
+enum EntityType { photo, client, site, equipment, revision, gpsBoundary }
 
-enum Operation {
-  create,
-  update,
-  delete,
-}
+enum Operation { create, update, delete }
 
-enum SyncStatus {
-  pending,
-  syncing,
-  synced,
-  failed,
-}
+enum SyncStatus { pending, syncing, synced, failed }
 
 class SyncPackage {
   final String id;

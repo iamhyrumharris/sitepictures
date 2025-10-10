@@ -14,12 +14,13 @@ import 'screens/settings/settings_screen.dart';
 import 'providers/photo_capture_provider.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/shell_scaffold.dart';
+import 'screens/equipment/folder_detail_screen.dart';
 import 'services/auth_service.dart';
 import 'services/database_service.dart';
 import 'providers/auth_state.dart';
 import 'providers/sync_state.dart';
-import 'widgets/bottom_nav.dart';
 import 'models/client.dart';
+import 'models/folder_photo.dart';
 
 class AppRouter {
   static final AuthService _authService = AuthService();
@@ -62,10 +63,7 @@ class AppRouter {
 
           // Home screen uses default camera FAB for now
           // (Add Client moved to AppBar or will be handled differently)
-          return ShellScaffold(
-            currentIndex: currentIndex,
-            child: child,
-          );
+          return ShellScaffold(currentIndex: currentIndex, child: child);
         },
         routes: [
           // Home route (now inside shell for consistent navigation)
@@ -148,6 +146,20 @@ class AppRouter {
               return EquipmentScreen(equipmentId: equipmentId);
             },
           ),
+
+          // Folder detail routes
+          GoRoute(
+            path: '/equipment/:equipmentId/folder/:folderId',
+            name: 'folderDetail',
+            builder: (context, state) {
+              final equipmentId = state.pathParameters['equipmentId']!;
+              final folderId = state.pathParameters['folderId']!;
+              return FolderDetailScreen(
+                equipmentId: equipmentId,
+                folderId: folderId,
+              );
+            },
+          ),
         ],
       ),
 
@@ -184,9 +196,19 @@ class AppRouter {
         path: '/camera-capture',
         name: 'cameraCapture',
         builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final folderId = extra?['folderId'] as String?;
+          final beforeAfterStr = extra?['beforeAfter'] as String?;
+          final beforeAfter = beforeAfterStr != null
+              ? BeforeAfter.values.byName(beforeAfterStr)
+              : null;
+
           return ChangeNotifierProvider(
             create: (_) => PhotoCaptureProvider(),
-            child: const CameraCapturePage(),
+            child: CameraCapturePage(
+              folderId: folderId,
+              beforeAfter: beforeAfter,
+            ),
           );
         },
       ),

@@ -4,8 +4,10 @@ import '../models/site.dart';
 import '../models/equipment.dart';
 import '../models/photo.dart';
 import '../models/user.dart';
+import '../models/photo_folder.dart';
 import '../services/database_service.dart';
 import '../services/api_service.dart';
+import '../services/folder_service.dart';
 
 class AppState extends ChangeNotifier {
   bool _isLoading = false;
@@ -15,6 +17,7 @@ class AppState extends ChangeNotifier {
 
   final _dbService = DatabaseService();
   final _apiService = ApiService();
+  final _folderService = FolderService();
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -130,7 +133,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> createMainSite(String clientId, String name, String? address) async {
+  Future<void> createMainSite(
+    String clientId,
+    String name,
+    String? address,
+  ) async {
     try {
       final site = MainSite(
         clientId: clientId,
@@ -181,7 +188,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> createSubSite(String mainSiteId, String name, String? description) async {
+  Future<void> createSubSite(
+    String mainSiteId,
+    String name,
+    String? description,
+  ) async {
     try {
       final subSite = SubSite(
         mainSiteId: mainSiteId,
@@ -288,6 +299,55 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // Folder methods (T008)
+
+  /// Get all photos with folder information
+  Future<List<Photo>> getPhotosWithFolderInfo(String equipmentId) async {
+    try {
+      final maps = await _dbService.getAllPhotosWithFolderInfo(equipmentId);
+      return maps.map((map) => Photo.fromMap(map)).toList();
+    } catch (e) {
+      setError('Failed to load photos with folder info: $e');
+      return [];
+    }
+  }
+
+  /// Get all folders for an equipment
+  Future<List<PhotoFolder>> getFoldersForEquipment(String equipmentId) async {
+    try {
+      final folders = await _folderService.getFolders(equipmentId);
+      return folders;
+    } catch (e) {
+      setError('Failed to load folders: $e');
+      return [];
+    }
+  }
+
+  /// Create a new folder
+  Future<PhotoFolder?> createFolder({
+    required String equipmentId,
+    required String workOrder,
+  }) async {
+    try {
+      if (_currentUser == null) {
+        setError('No user logged in');
+        return null;
+      }
+
+      final folder = await _folderService.createFolder(
+        equipmentId: equipmentId,
+        workOrder: workOrder,
+        createdBy: _currentUser!.id,
+      );
+
+      notifyListeners();
+      return folder;
+    } catch (e) {
+      setError('Failed to create folder: $e');
+      return null;
+    }
+  }
+
   // Search method
   Future<List<SearchResult>> search(String query) async {
     try {
@@ -302,12 +362,16 @@ class AppState extends ChangeNotifier {
         whereArgs: [searchPattern, 1],
         limit: 20,
       );
-      results.addAll(clients.map((c) => SearchResult(
+      results.addAll(
+        clients.map(
+          (c) => SearchResult(
             id: c['id'] as String,
             title: c['name'] as String,
             subtitle: 'Client',
             type: SearchResultType.client,
-          )));
+          ),
+        ),
+      );
 
       // Search main sites
       final mainSites = await db.query(
@@ -316,12 +380,16 @@ class AppState extends ChangeNotifier {
         whereArgs: [searchPattern, 1],
         limit: 20,
       );
-      results.addAll(mainSites.map((s) => SearchResult(
+      results.addAll(
+        mainSites.map(
+          (s) => SearchResult(
             id: s['id'] as String,
             title: s['name'] as String,
             subtitle: 'Main Site',
             type: SearchResultType.mainSite,
-          )));
+          ),
+        ),
+      );
 
       // Search equipment
       final equipment = await db.query(
@@ -330,14 +398,18 @@ class AppState extends ChangeNotifier {
         whereArgs: [searchPattern, searchPattern, 1],
         limit: 20,
       );
-      results.addAll(equipment.map((e) => SearchResult(
+      results.addAll(
+        equipment.map(
+          (e) => SearchResult(
             id: e['id'] as String,
             title: e['name'] as String,
             subtitle: e['serial_number'] != null
                 ? 'Equipment - S/N: ${e['serial_number']}'
                 : 'Equipment',
             type: SearchResultType.equipment,
-          )));
+          ),
+        ),
+      );
 
       return results;
     } catch (e) {
@@ -362,9 +434,4 @@ class SearchResult {
   });
 }
 
-enum SearchResultType {
-  client,
-  mainSite,
-  subSite,
-  equipment,
-}
+enum SearchResultType { client, mainSite, subSite, equipment }
