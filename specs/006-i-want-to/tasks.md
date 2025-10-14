@@ -59,12 +59,12 @@
 
 **Quick Save Workflow**:
 
-- [ ] T013 Create `QuickSaveService` implementation in `lib/services/quick_save_service.dart` with `quickSave()`, `generateUniqueName()`, `hasStorageAvailable()` methods per contract
+- [X] T013 Create `QuickSaveService` implementation in `lib/services/quick_save_service.dart` with `quickSave()`, `generateUniqueName()`, `hasStorageAvailable()` methods per contract
 - [ ] T014 Extend `CameraCapturePage` in `lib/screens/camera_capture_page.dart` to detect home context and show Quick Save/Next modal on Done button
 - [ ] T015 Implement Quick Save handler in `lib/screens/camera_capture_page.dart` that calls QuickSaveService and shows confirmation
 - [ ] T016 Create `NeedsAssignedPage` in `lib/screens/needs_assigned_page.dart` to display global "Needs Assigned" photos and folders
 - [ ] T017 Add navigation route from home page to NeedsAssignedPage (FAB or menu item)
-- [ ] T018 Create `NeedsAssignedBadge` widget in `lib/widgets/needs_assigned_badge.dart` (inbox icon + "Needs Assigned" label)
+- [X] T018 Create `NeedsAssignedBadge` widget in `lib/widgets/needs_assigned_badge.dart` (inbox icon + "Needs Assigned" label)
 
 **Next Button / Equipment Navigator Workflow**:
 
@@ -78,11 +78,11 @@
 
 **Save Service Integration**:
 
-- [ ] T026 Create `PhotoSaveService` implementation in `lib/services/photo_save_service.dart` with `saveToEquipment()`, `savePhotos()`, `hasStorageAvailable()` methods per contract
-- [ ] T027 Implement incremental save pattern in PhotoSaveService with progress stream
-- [ ] T028 Implement non-critical error handling (continue saving remaining photos)
-- [ ] T029 Implement critical error handling with rollback in PhotoSaveService
-- [ ] T030 Create `SaveProgressIndicator` widget in `lib/widgets/save_progress_indicator.dart` for loading UI during multi-photo saves
+- [X] T026 Create `PhotoSaveService` implementation in `lib/services/photo_save_service.dart` with `saveToEquipment()`, `savePhotos()`, `hasStorageAvailable()` methods per contract
+- [X] T027 Implement incremental save pattern in PhotoSaveService with progress stream
+- [X] T028 Implement non-critical error handling (continue saving remaining photos)
+- [X] T029 Implement critical error handling with rollback in PhotoSaveService
+- [X] T030 Create `SaveProgressIndicator` widget in `lib/widgets/save_progress_indicator.dart` for loading UI during multi-photo saves
 - [ ] T031 Add logging for all save operations in QuickSaveService and PhotoSaveService (FR-056)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - can capture from home, Quick Save to global "Needs Assigned", or use Next to select equipment
