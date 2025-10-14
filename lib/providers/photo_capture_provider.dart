@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../models/photo_session.dart';
+import '../models/camera_context.dart';
 import '../services/camera_service.dart';
 import '../services/photo_storage_service.dart';
 
@@ -26,9 +27,13 @@ class PhotoCaptureProvider extends ChangeNotifier {
   CameraStatus _cameraStatus = CameraStatus.uninitialized;
   String? _errorMessage;
   bool _isInitializing = false;
+  CameraContext _cameraContext = const CameraContext(type: CameraContextType.home);
 
   /// Current photo session
   PhotoSession get session => _session;
+
+  /// Camera context for determining save button display
+  CameraContext get cameraContext => _cameraContext;
 
   /// Camera status
   CameraStatus get cameraStatus => _cameraStatus;
@@ -54,6 +59,12 @@ class PhotoCaptureProvider extends ChangeNotifier {
 
   /// Get camera controller for preview
   get controller => _cameraService.controller;
+
+  /// Set camera context (called from CameraCapturePage)
+  void setCameraContext(CameraContext context) {
+    _cameraContext = context;
+    notifyListeners();
+  }
 
   /// Initialize camera (FR-001, FR-021)
   Future<void> initializeCamera() async {

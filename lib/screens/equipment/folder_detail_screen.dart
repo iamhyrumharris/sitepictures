@@ -5,6 +5,7 @@ import '../../models/photo.dart';
 import '../../models/folder_photo.dart';
 import '../../providers/folder_provider.dart';
 import '../../widgets/photo_delete_dialog.dart';
+import '../../widgets/bottom_nav.dart';
 import '../../services/database_service.dart';
 import 'dart:io';
 
@@ -71,10 +72,15 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
         ? BeforeAfter.before
         : BeforeAfter.after;
 
-    // Navigate to camera with folderId and beforeAfter context
+    // T016 & T017: Navigate to camera with before/after context
+    final contextStr = currentTab == 0 ? 'equipment-before' : 'equipment-after';
     context.push(
       '/camera-capture',
-      extra: {'folderId': widget.folderId, 'beforeAfter': beforeAfter.name},
+      extra: {
+        'context': contextStr,
+        'folderId': widget.folderId,
+        'beforeAfter': beforeAfter.name,
+      },
     );
   }
 
@@ -170,10 +176,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
                 ),
               ],
             ),
+      bottomNavigationBar: const BottomNav(currentIndex: -1),
       floatingActionButton: FloatingActionButton(
         onPressed: _capturePhotos,
         child: const Icon(Icons.camera_alt),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

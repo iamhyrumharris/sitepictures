@@ -12,8 +12,6 @@ class BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return BottomAppBar(
       color: Colors.white,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8.0,
       child: SizedBox(
         height: 60,
         child: Row(

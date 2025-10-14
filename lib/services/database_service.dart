@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -73,26 +73,36 @@ class DatabaseService {
       )
     ''');
 
-    // Sub sites table
+    // Sub sites table - supports flexible hierarchy (client, main_site, or parent_subsite)
     await db.execute('''
       CREATE TABLE sub_sites (
         id TEXT PRIMARY KEY,
-        main_site_id TEXT NOT NULL,
+        client_id TEXT,
+        main_site_id TEXT,
+        parent_subsite_id TEXT,
         name TEXT NOT NULL,
         description TEXT,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (client_id) REFERENCES clients (id),
         FOREIGN KEY (main_site_id) REFERENCES main_sites (id),
-        FOREIGN KEY (created_by) REFERENCES users (id)
+        FOREIGN KEY (parent_subsite_id) REFERENCES sub_sites (id),
+        FOREIGN KEY (created_by) REFERENCES users (id),
+        CHECK (
+          (client_id IS NOT NULL AND main_site_id IS NULL AND parent_subsite_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NOT NULL AND parent_subsite_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NULL AND parent_subsite_id IS NOT NULL)
+        )
       )
     ''');
 
-    // Equipment table
+    // Equipment table - supports flexible hierarchy (client, main_site, or sub_site)
     await db.execute('''
       CREATE TABLE equipment (
         id TEXT PRIMARY KEY,
+        client_id TEXT,
         main_site_id TEXT,
         sub_site_id TEXT,
         name TEXT NOT NULL,
@@ -103,11 +113,15 @@ class DatabaseService {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (client_id) REFERENCES clients (id),
         FOREIGN KEY (main_site_id) REFERENCES main_sites (id),
         FOREIGN KEY (sub_site_id) REFERENCES sub_sites (id),
         FOREIGN KEY (created_by) REFERENCES users (id),
-        CHECK ((main_site_id IS NOT NULL AND sub_site_id IS NULL) OR
-               (main_site_id IS NULL AND sub_site_id IS NOT NULL))
+        CHECK (
+          (client_id IS NOT NULL AND main_site_id IS NULL AND sub_site_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NOT NULL AND sub_site_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NULL AND sub_site_id IS NOT NULL)
+        )
       )
     ''');
 
@@ -178,7 +192,16 @@ class DatabaseService {
       'CREATE INDEX idx_mainsite_client ON main_sites(client_id, is_active)',
     );
     await db.execute(
+      'CREATE INDEX idx_subsite_client ON sub_sites(client_id, is_active)',
+    );
+    await db.execute(
       'CREATE INDEX idx_subsite_mainsite ON sub_sites(main_site_id, is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_subsite_parent ON sub_sites(parent_subsite_id, is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_equipment_client ON equipment(client_id, is_active)',
     );
     await db.execute(
       'CREATE INDEX idx_equipment_mainsite ON equipment(main_site_id, is_active)',
@@ -214,6 +237,10 @@ class DatabaseService {
     // Migration 002: Add photo folders feature
     if (oldVersion < 2) {
       await _migration002(db);
+    }
+    // Migration 003: Flexible hierarchy for subsites and equipment
+    if (oldVersion < 3) {
+      await _migration003(db);
     }
   }
 
@@ -265,6 +292,119 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX idx_folder_photos_photo ON folder_photos(photo_id)',
+    );
+  }
+
+  Future<void> _migration003(Database db) async {
+    // Migration 003: Flexible Hierarchy
+    // Feature: 005-i-want-to
+    // Date: 2025-10-13
+    // Changes: Add support for subsites and equipment at client level, and nested subsites
+
+    // === STEP 1: Migrate sub_sites table ===
+
+    // Create new sub_sites table with updated schema
+    await db.execute('''
+      CREATE TABLE sub_sites_new (
+        id TEXT PRIMARY KEY,
+        client_id TEXT,
+        main_site_id TEXT,
+        parent_subsite_id TEXT,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (client_id) REFERENCES clients (id),
+        FOREIGN KEY (main_site_id) REFERENCES main_sites (id),
+        FOREIGN KEY (parent_subsite_id) REFERENCES sub_sites_new (id),
+        FOREIGN KEY (created_by) REFERENCES users (id),
+        CHECK (
+          (client_id IS NOT NULL AND main_site_id IS NULL AND parent_subsite_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NOT NULL AND parent_subsite_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NULL AND parent_subsite_id IS NOT NULL)
+        )
+      )
+    ''');
+
+    // Copy existing data from old sub_sites table (all existing subsites belong to main_sites)
+    await db.execute('''
+      INSERT INTO sub_sites_new
+        (id, main_site_id, name, description, created_by, created_at, updated_at, is_active)
+      SELECT
+        id, main_site_id, name, description, created_by, created_at, updated_at, is_active
+      FROM sub_sites
+    ''');
+
+    // Drop old table and rename new table
+    await db.execute('DROP TABLE sub_sites');
+    await db.execute('ALTER TABLE sub_sites_new RENAME TO sub_sites');
+
+    // Recreate indexes for sub_sites
+    await db.execute(
+      'CREATE INDEX idx_subsite_client ON sub_sites(client_id, is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_subsite_mainsite ON sub_sites(main_site_id, is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_subsite_parent ON sub_sites(parent_subsite_id, is_active)',
+    );
+
+    // === STEP 2: Migrate equipment table ===
+
+    // Create new equipment table with updated schema
+    await db.execute('''
+      CREATE TABLE equipment_new (
+        id TEXT PRIMARY KEY,
+        client_id TEXT,
+        main_site_id TEXT,
+        sub_site_id TEXT,
+        name TEXT NOT NULL,
+        serial_number TEXT,
+        manufacturer TEXT,
+        model TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (client_id) REFERENCES clients (id),
+        FOREIGN KEY (main_site_id) REFERENCES main_sites (id),
+        FOREIGN KEY (sub_site_id) REFERENCES sub_sites (id),
+        FOREIGN KEY (created_by) REFERENCES users (id),
+        CHECK (
+          (client_id IS NOT NULL AND main_site_id IS NULL AND sub_site_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NOT NULL AND sub_site_id IS NULL) OR
+          (client_id IS NULL AND main_site_id IS NULL AND sub_site_id IS NOT NULL)
+        )
+      )
+    ''');
+
+    // Copy existing data from old equipment table
+    await db.execute('''
+      INSERT INTO equipment_new
+        (id, main_site_id, sub_site_id, name, serial_number, manufacturer, model,
+         created_by, created_at, updated_at, is_active)
+      SELECT
+        id, main_site_id, sub_site_id, name, serial_number, manufacturer, model,
+        created_by, created_at, updated_at, is_active
+      FROM equipment
+    ''');
+
+    // Drop old table and rename new table
+    await db.execute('DROP TABLE equipment');
+    await db.execute('ALTER TABLE equipment_new RENAME TO equipment');
+
+    // Recreate indexes for equipment
+    await db.execute(
+      'CREATE INDEX idx_equipment_client ON equipment(client_id, is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_equipment_mainsite ON equipment(main_site_id, is_active)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_equipment_subsite ON equipment(sub_site_id, is_active)',
     );
   }
 

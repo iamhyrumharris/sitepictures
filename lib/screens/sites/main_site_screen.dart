@@ -5,10 +5,13 @@ import '../../models/site.dart';
 import '../../models/equipment.dart';
 import '../../models/user.dart';
 import '../../models/client.dart';
+import '../../models/fab_menu_item.dart';
 import '../../providers/app_state.dart';
 import '../../providers/auth_state.dart';
 import '../../providers/navigation_state.dart' as nav_state;
 import '../../widgets/breadcrumb_navigation.dart';
+import '../../widgets/expandable_fab.dart';
+import '../../widgets/bottom_nav.dart';
 
 /// Main site screen showing subsites and equipment
 /// Implements FR-005, FR-006
@@ -95,7 +98,9 @@ class _MainSiteScreenState extends State<MainSiteScreen> {
           Expanded(child: _buildBody()),
         ],
       ),
+      bottomNavigationBar: const BottomNav(currentIndex: -1),
       floatingActionButton: _buildFAB(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -217,49 +222,39 @@ class _MainSiteScreenState extends State<MainSiteScreen> {
     );
   }
 
+  /// T025, T030: Build expandable FAB with permission check
   Widget? _buildFAB() {
     final authState = context.watch<AuthState>();
     final user = authState.currentUser;
 
-    if (user?.role != UserRole.admin && user?.role != UserRole.technician) {
+    // T030: Only show FAB for admin and technician roles (hide for viewer)
+    if (user?.role == UserRole.viewer) {
       return null;
     }
 
-    return FloatingActionButton(
-      heroTag: 'mainsite_add_item_fab_${widget.siteId}',
-      onPressed: _showAddMenu,
-      child: const Icon(Icons.add),
-      tooltip: 'Add SubSite or Equipment',
+    // T029: Use ExpandableFAB with menu items
+    return ExpandableFAB(
+      heroTag: 'mainsite_fab_${widget.siteId}',
+      menuItems: _getFABMenuItems(),
     );
   }
 
-  void _showAddMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.folder),
-              title: const Text('Add SubSite'),
-              onTap: () {
-                Navigator.pop(context);
-                _showAddSubSiteDialog();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.precision_manufacturing),
-              title: const Text('Add Equipment'),
-              onTap: () {
-                Navigator.pop(context);
-                _showAddEquipmentDialog();
-              },
-            ),
-          ],
-        ),
+  /// T026: Get FAB menu items (2 items for main site page)
+  List<FABMenuItem> _getFABMenuItems() {
+    return [
+      FABMenuItem(
+        label: 'Add SubSite',
+        icon: Icons.folder,
+        onTap: _showAddSubSiteDialog,
+        backgroundColor: Colors.orange,
       ),
-    );
+      FABMenuItem(
+        label: 'Add Equipment',
+        icon: Icons.precision_manufacturing,
+        onTap: _showAddEquipmentDialog,
+        backgroundColor: Colors.purple,
+      ),
+    ];
   }
 
   void _showAddSubSiteDialog() {
@@ -309,11 +304,11 @@ class _MainSiteScreenState extends State<MainSiteScreen> {
               try {
                 final appState = context.read<AppState>();
                 await appState.createSubSite(
-                  widget.siteId,
                   nameController.text.trim(),
                   descriptionController.text.trim().isEmpty
                       ? null
                       : descriptionController.text.trim(),
+                  mainSiteId: widget.siteId,
                 );
 
                 Navigator.pop(context);

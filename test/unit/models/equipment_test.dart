@@ -35,7 +35,20 @@ void main() {
       expect(equipment.name, 'Compressor B');
     });
 
-    test('throws assertion error when both mainSiteId and subSiteId are null', () {
+    test('creates equipment for client', () {
+      final equipment = Equipment(
+        clientId: 'client-123',
+        name: 'Portable Generator',
+        createdBy: 'user-123',
+      );
+
+      expect(equipment.clientId, 'client-123');
+      expect(equipment.mainSiteId, null);
+      expect(equipment.subSiteId, null);
+      expect(equipment.name, 'Portable Generator');
+    });
+
+    test('throws assertion error when all parent IDs are null', () {
       expect(
         () => Equipment(
           name: 'Invalid Equipment',
@@ -45,11 +58,37 @@ void main() {
       );
     });
 
-    test('throws assertion error when both mainSiteId and subSiteId are set',
+    test('throws assertion error when mainSiteId and subSiteId are both set',
         () {
       expect(
         () => Equipment(
           mainSiteId: 'main-site-123',
+          subSiteId: 'sub-site-123',
+          name: 'Invalid Equipment',
+          createdBy: 'user-123',
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('throws assertion error when clientId and mainSiteId are both set',
+        () {
+      expect(
+        () => Equipment(
+          clientId: 'client-123',
+          mainSiteId: 'main-site-123',
+          name: 'Invalid Equipment',
+          createdBy: 'user-123',
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('throws assertion error when clientId and subSiteId are both set',
+        () {
+      expect(
+        () => Equipment(
+          clientId: 'client-123',
           subSiteId: 'sub-site-123',
           name: 'Invalid Equipment',
           createdBy: 'user-123',
@@ -98,24 +137,34 @@ void main() {
       expect(equipment.isValid(), false);
     });
 
-    test('parentSiteId returns mainSiteId when present', () {
+    test('parentId returns clientId when present', () {
+      final equipment = Equipment(
+        clientId: 'client-123',
+        name: 'Generator A',
+        createdBy: 'user-123',
+      );
+
+      expect(equipment.parentId, 'client-123');
+    });
+
+    test('parentId returns mainSiteId when present', () {
       final equipment = Equipment(
         mainSiteId: 'main-site-123',
         name: 'Generator A',
         createdBy: 'user-123',
       );
 
-      expect(equipment.parentSiteId, 'main-site-123');
+      expect(equipment.parentId, 'main-site-123');
     });
 
-    test('parentSiteId returns subSiteId when mainSiteId is null', () {
+    test('parentId returns subSiteId when mainSiteId and clientId are null', () {
       final equipment = Equipment(
         subSiteId: 'sub-site-123',
         name: 'Compressor B',
         createdBy: 'user-123',
       );
 
-      expect(equipment.parentSiteId, 'sub-site-123');
+      expect(equipment.parentId, 'sub-site-123');
     });
 
     group('Serialization', () {
@@ -133,6 +182,7 @@ void main() {
         final map = equipment.toMap();
 
         expect(map['id'], 'test-id');
+        expect(map['client_id'], null);
         expect(map['main_site_id'], 'main-site-123');
         expect(map['sub_site_id'], null);
         expect(map['name'], 'Generator A');
@@ -146,6 +196,7 @@ void main() {
       test('fromMap creates equipment from database map', () {
         final map = {
           'id': 'test-id',
+          'client_id': null,
           'main_site_id': 'main-site-123',
           'sub_site_id': null,
           'name': 'Generator A',
@@ -161,6 +212,7 @@ void main() {
         final equipment = Equipment.fromMap(map);
 
         expect(equipment.id, 'test-id');
+        expect(equipment.clientId, null);
         expect(equipment.mainSiteId, 'main-site-123');
         expect(equipment.subSiteId, null);
         expect(equipment.name, 'Generator A');
@@ -171,6 +223,7 @@ void main() {
       test('fromMap handles equipment with subSiteId', () {
         final map = {
           'id': 'test-id',
+          'client_id': null,
           'main_site_id': null,
           'sub_site_id': 'sub-site-123',
           'name': 'Compressor B',
@@ -185,9 +238,33 @@ void main() {
 
         final equipment = Equipment.fromMap(map);
 
+        expect(equipment.clientId, null);
         expect(equipment.mainSiteId, null);
         expect(equipment.subSiteId, 'sub-site-123');
         expect(equipment.serialNumber, null);
+      });
+
+      test('fromMap handles equipment with clientId', () {
+        final map = {
+          'id': 'test-id',
+          'client_id': 'client-123',
+          'main_site_id': null,
+          'sub_site_id': null,
+          'name': 'Portable Generator',
+          'serial_number': null,
+          'manufacturer': null,
+          'model': null,
+          'created_by': 'user-123',
+          'created_at': '2025-01-01T00:00:00.000Z',
+          'updated_at': '2025-01-01T00:00:00.000Z',
+          'is_active': 1,
+        };
+
+        final equipment = Equipment.fromMap(map);
+
+        expect(equipment.clientId, 'client-123');
+        expect(equipment.mainSiteId, null);
+        expect(equipment.subSiteId, null);
       });
 
       test('toJson converts to API format', () {
@@ -201,6 +278,7 @@ void main() {
         final json = equipment.toJson();
 
         expect(json['id'], 'test-id');
+        expect(json['clientId'], null);
         expect(json['mainSiteId'], 'main-site-123');
         expect(json['subSiteId'], null);
         expect(json['name'], 'Generator A');
@@ -210,6 +288,7 @@ void main() {
       test('fromJson creates equipment from API JSON', () {
         final json = {
           'id': 'test-id',
+          'clientId': null,
           'mainSiteId': 'main-site-123',
           'subSiteId': null,
           'name': 'Generator A',
@@ -225,6 +304,7 @@ void main() {
         final equipment = Equipment.fromJson(json);
 
         expect(equipment.id, 'test-id');
+        expect(equipment.clientId, null);
         expect(equipment.mainSiteId, 'main-site-123');
         expect(equipment.name, 'Generator A');
       });

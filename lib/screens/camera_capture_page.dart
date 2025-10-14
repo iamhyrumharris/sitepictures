@@ -6,16 +6,17 @@ import '../providers/photo_capture_provider.dart';
 import '../widgets/camera_preview_overlay.dart';
 import '../widgets/photo_thumbnail_strip.dart';
 import '../widgets/capture_button.dart';
+import '../widgets/context_aware_save_buttons.dart';
 import '../models/folder_photo.dart';
+import '../models/camera_context.dart';
 import '../services/folder_service.dart';
 
 /// Main camera capture screen for work site photo documentation
-/// Supports optional folder context for before/after photo categorization
+/// Supports context-aware save button display based on launch context
 class CameraCapturePage extends StatefulWidget {
-  final String? folderId;
-  final BeforeAfter? beforeAfter;
+  final CameraContext cameraContext;
 
-  const CameraCapturePage({Key? key, this.folderId, this.beforeAfter})
+  const CameraCapturePage({Key? key, required this.cameraContext})
     : super(key: key);
 
   @override
@@ -31,8 +32,9 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Initialize camera
+    // Initialize camera and set context
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _provider?.setCameraContext(widget.cameraContext);
       _provider?.initializeCamera();
     });
   }
@@ -111,12 +113,11 @@ class _CameraCapturePageState extends State<CameraCapturePage>
   Future<void> _handleDone(BuildContext context) async {
     final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
 
-    // FR-013: Show modal with Next and Quick Save buttons
-    final result = await showModalBottomSheet<String>(
+    // Render context-aware save buttons based on camera context
+    await showModalBottomSheet(
       context: context,
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
-        height: 200,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,53 +128,108 @@ class _CameraCapturePageState extends State<CameraCapturePage>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            // FR-014: Next button
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop('next'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text('Next', style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 12),
-            // FR-015: Quick Save button
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop('quick_save'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text('Quick Save', style: TextStyle(fontSize: 16)),
+            ContextAwareSaveButtons(
+              cameraContext: widget.cameraContext,
+              onNext: () => _handleNext(context),
+              onQuickSave: () => _handleQuickSave(context),
+              onEquipmentSave: () => _handleEquipmentSave(context),
+              onBeforeSave: () => _handleBeforeSave(context),
+              onAfterSave: () => _handleAfterSave(context),
             ),
           ],
         ),
       ),
     );
+  }
 
-    if (result != null) {
-      // If capturing in folder context, associate photos with folder
-      if (widget.folderId != null && widget.beforeAfter != null) {
-        final folderService = FolderService();
-        for (final photo in provider.session.photos) {
-          try {
-            await folderService.addPhotoToFolder(
-              folderId: widget.folderId!,
-              photoId: photo.id,
-              beforeAfter: widget.beforeAfter!,
-            );
-          } catch (e) {
-            // Log error but don't fail the entire operation
-            debugPrint('Error associating photo ${photo.id} with folder: $e');
-          }
-        }
-      }
+  /// T010: Home context - Next button handler (preserve existing behavior)
+  Future<void> _handleNext(BuildContext context) async {
+    final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
+    provider.completeSession();
 
-      provider.completeSession();
-      // FR-016, FR-017: Placeholder - return photos to caller
-      if (mounted) {
-        Navigator.of(context).pop(provider.session.photos);
-      }
+    // Close modal
+    Navigator.of(context).pop();
+
+    // Return photos to caller (existing behavior)
+    if (mounted) {
+      Navigator.of(context).pop(provider.session.photos);
+    }
+  }
+
+  /// T010: Home context - Quick Save button handler (preserve existing behavior)
+  Future<void> _handleQuickSave(BuildContext context) async {
+    final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
+    provider.completeSession();
+
+    // Close modal
+    Navigator.of(context).pop();
+
+    // Return photos to caller (existing behavior)
+    if (mounted) {
+      Navigator.of(context).pop(provider.session.photos);
+    }
+  }
+
+  /// T011: Equipment all photos context - Mock save handler
+  void _handleEquipmentSave(BuildContext context) {
+    // Close modal
+    Navigator.of(context).pop();
+
+    // Show placeholder message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Equipment photo save coming soon!\n'
+          'Photos captured in this session will be available in the gallery.',
+        ),
+        duration: Duration(seconds: 3),
+        backgroundColor: Colors.blue,
+      ),
+    );
+
+    // Return to previous screen
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  /// T012: Equipment before context - Mock save handler
+  void _handleBeforeSave(BuildContext context) {
+    // Close modal
+    Navigator.of(context).pop();
+
+    // Show placeholder message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Before/After categorization coming soon!'),
+        duration: Duration(seconds: 3),
+        backgroundColor: Colors.orange,
+      ),
+    );
+
+    // Return to previous screen
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  /// T013: Equipment after context - Mock save handler
+  void _handleAfterSave(BuildContext context) {
+    // Close modal
+    Navigator.of(context).pop();
+
+    // Show placeholder message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Before/After categorization coming soon!'),
+        duration: Duration(seconds: 3),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Return to previous screen
+    if (mounted) {
+      Navigator.of(context).pop();
     }
   }
 

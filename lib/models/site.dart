@@ -142,7 +142,9 @@ class MainSite {
 
 class SubSite {
   final String id;
-  final String mainSiteId;
+  final String? clientId;
+  final String? mainSiteId;
+  final String? parentSubSiteId;
   final String name;
   final String? description;
   final String createdBy;
@@ -152,22 +154,35 @@ class SubSite {
 
   SubSite({
     String? id,
-    required this.mainSiteId,
+    this.clientId,
+    this.mainSiteId,
+    this.parentSubSiteId,
     required this.name,
     this.description,
     required this.createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isActive = true,
-  }) : id = id ?? const Uuid().v4(),
+  }) : assert(
+         (clientId != null) ^ (mainSiteId != null) ^ (parentSubSiteId != null),
+         'SubSite must belong to exactly one of: Client, MainSite, or ParentSubSite (XOR constraint)',
+       ),
+       id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
   // Validation
   bool isValid() {
     if (name.isEmpty || name.length > 100) return false;
-    if (mainSiteId.isEmpty) return false;
     if (createdBy.isEmpty) return false;
+    // XOR validation: exactly one of clientId, mainSiteId, or parentSubSiteId must be non-null
+    final hasClient = clientId != null;
+    final hasMainSite = mainSiteId != null;
+    final hasParent = parentSubSiteId != null;
+    if (hasClient && hasMainSite) return false;
+    if (hasClient && hasParent) return false;
+    if (hasMainSite && hasParent) return false;
+    if (!hasClient && !hasMainSite && !hasParent) return false;
     return true;
   }
 
@@ -175,7 +190,9 @@ class SubSite {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'client_id': clientId,
       'main_site_id': mainSiteId,
+      'parent_subsite_id': parentSubSiteId,
       'name': name,
       'description': description,
       'created_by': createdBy,
@@ -189,7 +206,9 @@ class SubSite {
   factory SubSite.fromMap(Map<String, dynamic> map) {
     return SubSite(
       id: map['id'],
+      clientId: map['client_id'],
       mainSiteId: map['main_site_id'],
+      parentSubSiteId: map['parent_subsite_id'],
       name: map['name'],
       description: map['description'],
       createdBy: map['created_by'],
@@ -203,7 +222,9 @@ class SubSite {
   factory SubSite.fromJson(Map<String, dynamic> json) {
     return SubSite(
       id: json['id'],
+      clientId: json['clientId'],
       mainSiteId: json['mainSiteId'],
+      parentSubSiteId: json['parentSubSiteId'],
       name: json['name'],
       description: json['description'],
       createdBy: json['createdBy'],
@@ -217,7 +238,9 @@ class SubSite {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'clientId': clientId,
       'mainSiteId': mainSiteId,
+      'parentSubSiteId': parentSubSiteId,
       'name': name,
       'description': description,
       'createdBy': createdBy,
@@ -231,7 +254,9 @@ class SubSite {
   SubSite copyWith({String? name, String? description, bool? isActive}) {
     return SubSite(
       id: id,
+      clientId: clientId,
       mainSiteId: mainSiteId,
+      parentSubSiteId: parentSubSiteId,
       name: name ?? this.name,
       description: description ?? this.description,
       createdBy: createdBy,

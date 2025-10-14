@@ -189,13 +189,17 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> createSubSite(
-    String mainSiteId,
     String name,
-    String? description,
-  ) async {
+    String? description, {
+    String? clientId,
+    String? mainSiteId,
+    String? parentSubSiteId,
+  }) async {
     try {
       final subSite = SubSite(
+        clientId: clientId,
         mainSiteId: mainSiteId,
+        parentSubSiteId: parentSubSiteId,
         name: name,
         description: description,
         createdBy: _currentUser?.id ?? 'unknown',
@@ -206,6 +210,38 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       setError('Failed to create sub site: $e');
       rethrow;
+    }
+  }
+
+  Future<List<SubSite>> getSubSitesForClient(String clientId) async {
+    try {
+      final db = await _dbService.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'sub_sites',
+        where: 'client_id = ? AND is_active = ?',
+        whereArgs: [clientId, 1],
+        orderBy: 'name ASC',
+      );
+      return maps.map((map) => SubSite.fromMap(map)).toList();
+    } catch (e) {
+      setError('Failed to load subsites for client: $e');
+      return [];
+    }
+  }
+
+  Future<List<SubSite>> getNestedSubSites(String parentSubSiteId) async {
+    try {
+      final db = await _dbService.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'sub_sites',
+        where: 'parent_subsite_id = ? AND is_active = ?',
+        whereArgs: [parentSubSiteId, 1],
+        orderBy: 'name ASC',
+      );
+      return maps.map((map) => SubSite.fromMap(map)).toList();
+    } catch (e) {
+      setError('Failed to load nested subsites: $e');
+      return [];
     }
   }
 
@@ -261,6 +297,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> createEquipment(
     String name, {
+    String? clientId,
     String? mainSiteId,
     String? subSiteId,
     String? serialNumber,
@@ -268,6 +305,7 @@ class AppState extends ChangeNotifier {
     try {
       final equipment = Equipment(
         name: name,
+        clientId: clientId,
         mainSiteId: mainSiteId,
         subSiteId: subSiteId,
         serialNumber: serialNumber,
@@ -279,6 +317,22 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       setError('Failed to create equipment: $e');
       rethrow;
+    }
+  }
+
+  Future<List<Equipment>> getEquipmentForClient(String clientId) async {
+    try {
+      final db = await _dbService.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'equipment',
+        where: 'client_id = ? AND is_active = ?',
+        whereArgs: [clientId, 1],
+        orderBy: 'name ASC',
+      );
+      return maps.map((map) => Equipment.fromMap(map)).toList();
+    } catch (e) {
+      setError('Failed to load equipment for client: $e');
+      return [];
     }
   }
 

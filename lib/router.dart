@@ -20,7 +20,7 @@ import 'services/database_service.dart';
 import 'providers/auth_state.dart';
 import 'providers/sync_state.dart';
 import 'models/client.dart';
-import 'models/folder_photo.dart';
+import 'models/camera_context.dart';
 
 class AppRouter {
   static final AuthService _authService = AuthService();
@@ -99,68 +99,69 @@ class AppRouter {
             name: 'settings',
             builder: (context, state) => const SettingsScreen(),
           ),
-
-          // Client routes
-          GoRoute(
-            path: '/client/:clientId',
-            name: 'client',
-            builder: (context, state) {
-              final clientId = state.pathParameters['clientId']!;
-              return ClientDetailScreen(clientId: clientId);
-            },
-          ),
-
-          // Main site routes
-          GoRoute(
-            path: '/site/:siteId',
-            name: 'mainSite',
-            builder: (context, state) {
-              final siteId = state.pathParameters['siteId']!;
-              final clientId = state.uri.queryParameters['clientId'] ?? '';
-              return MainSiteScreen(clientId: clientId, siteId: siteId);
-            },
-          ),
-
-          // SubSite routes
-          GoRoute(
-            path: '/subsite/:subSiteId',
-            name: 'subSite',
-            builder: (context, state) {
-              final subSiteId = state.pathParameters['subSiteId']!;
-              final clientId = state.uri.queryParameters['clientId'] ?? '';
-              final mainSiteId = state.uri.queryParameters['mainSiteId'] ?? '';
-              return SubSiteScreen(
-                clientId: clientId,
-                mainSiteId: mainSiteId,
-                subSiteId: subSiteId,
-              );
-            },
-          ),
-
-          // Equipment routes
-          GoRoute(
-            path: '/equipment/:equipmentId',
-            name: 'equipment',
-            builder: (context, state) {
-              final equipmentId = state.pathParameters['equipmentId']!;
-              return EquipmentScreen(equipmentId: equipmentId);
-            },
-          ),
-
-          // Folder detail routes
-          GoRoute(
-            path: '/equipment/:equipmentId/folder/:folderId',
-            name: 'folderDetail',
-            builder: (context, state) {
-              final equipmentId = state.pathParameters['equipmentId']!;
-              final folderId = state.pathParameters['folderId']!;
-              return FolderDetailScreen(
-                equipmentId: equipmentId,
-                folderId: folderId,
-              );
-            },
-          ),
         ],
+      ),
+
+      // Detail screens (outside shell - no bottom nav, custom FABs)
+      // Client routes
+      GoRoute(
+        path: '/client/:clientId',
+        name: 'client',
+        builder: (context, state) {
+          final clientId = state.pathParameters['clientId']!;
+          return ClientDetailScreen(clientId: clientId);
+        },
+      ),
+
+      // Main site routes
+      GoRoute(
+        path: '/site/:siteId',
+        name: 'mainSite',
+        builder: (context, state) {
+          final siteId = state.pathParameters['siteId']!;
+          final clientId = state.uri.queryParameters['clientId'] ?? '';
+          return MainSiteScreen(clientId: clientId, siteId: siteId);
+        },
+      ),
+
+      // SubSite routes
+      GoRoute(
+        path: '/subsite/:subSiteId',
+        name: 'subSite',
+        builder: (context, state) {
+          final subSiteId = state.pathParameters['subSiteId']!;
+          final clientId = state.uri.queryParameters['clientId'] ?? '';
+          final mainSiteId = state.uri.queryParameters['mainSiteId'] ?? '';
+          return SubSiteScreen(
+            clientId: clientId,
+            mainSiteId: mainSiteId,
+            subSiteId: subSiteId,
+          );
+        },
+      ),
+
+      // Equipment routes
+      GoRoute(
+        path: '/equipment/:equipmentId',
+        name: 'equipment',
+        builder: (context, state) {
+          final equipmentId = state.pathParameters['equipmentId']!;
+          return EquipmentScreen(equipmentId: equipmentId);
+        },
+      ),
+
+      // Folder detail routes
+      GoRoute(
+        path: '/equipment/:equipmentId/folder/:folderId',
+        name: 'folderDetail',
+        builder: (context, state) {
+          final equipmentId = state.pathParameters['equipmentId']!;
+          final folderId = state.pathParameters['folderId']!;
+          return FolderDetailScreen(
+            equipmentId: equipmentId,
+            folderId: folderId,
+          );
+        },
       ),
 
       // Camera and carousel routes (full screen, no bottom nav)
@@ -197,17 +198,12 @@ class AppRouter {
         name: 'cameraCapture',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          final folderId = extra?['folderId'] as String?;
-          final beforeAfterStr = extra?['beforeAfter'] as String?;
-          final beforeAfter = beforeAfterStr != null
-              ? BeforeAfter.values.byName(beforeAfterStr)
-              : null;
+          final cameraContext = CameraContext.fromMap(extra ?? {});
 
           return ChangeNotifierProvider(
             create: (_) => PhotoCaptureProvider(),
             child: CameraCapturePage(
-              folderId: folderId,
-              beforeAfter: beforeAfter,
+              cameraContext: cameraContext,
             ),
           );
         },

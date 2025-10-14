@@ -1,15 +1,16 @@
 <!--
 Sync Impact Report
-Version change: Template → 1.0.0
-Modified principles: None (initial creation from template)
-Added sections: All sections newly defined
-Removed sections: Generic template placeholders
+Version change: 1.0.0 → 1.0.1
+Modified principles: None
+Added sections: None
+Removed sections: None
 Templates requiring updates:
-  ✅ .specify/memory/constitution.md (completed)
-  ⚠ .specify/templates/plan-template.md (needs review for constitution alignment)
-  ⚠ .specify/templates/spec-template.md (needs review for scope alignment)
-  ⚠ .specify/templates/tasks-template.md (needs review for task categories)
-Follow-up TODOs: None - all placeholders resolved
+✅ .specify/memory/constitution.md (completed - installed from user-provided constitution)
+✅ .specify/templates/plan-template.md (reviewed - already aligned with constitution check section)
+✅ .specify/templates/spec-template.md (reviewed - already aligned with user scenarios and requirements)
+✅ .specify/templates/tasks-template.md (reviewed - already aligned with phased task organization)
+Follow-up TODOs: None
+Rationale: PATCH version bump (1.0.0 → 1.0.1) - Constitution content installed into proper template location with no semantic changes. Project name remains "sitepictures" (official app name: FieldPhoto Pro).
 -->
 
 # FieldPhoto Pro Constitution
@@ -46,7 +47,8 @@ No photo or annotation shall ever be lost due to technical failure. The system m
 *Rationale: Photos represent critical documentation for safety, compliance, and liability purposes. Data loss is never acceptable.*
 
 ### IV. Hierarchical Consistency
-The four-level folder structure MUST be enforced consistently across all features. All functionality must respect the hierarchy: Client → Main Site → Sub Site → Equipment/Panel
+The four-level folder structure MUST be enforced consistently across all features. All functionality must respect the hierarchy:
+- Client → Main Site → Sub Site → Equipment/Panel
 - Navigation must maintain consistent breadcrumb patterns
 - Search results must show full hierarchical context
 - Permissions and organization follow hierarchy boundaries
@@ -109,11 +111,11 @@ All team collaboration features MUST maintain clear audit trails and attribution
 ### Violation Protocol
 When any proposed feature or implementation conflicts with constitutional principles:
 
-1. **Immediate Halt**: Stop development of conflicting feature
-2. **Root Cause Analysis**: Identify why the conflict exists
-3. **Constitutional Review**: Determine if principle applies or requires clarification
-4. **Resolution Path**: Either modify implementation or formally amend constitution
-5. **Documentation**: Record decision rationale for future reference
+**Immediate Halt**: Stop development of conflicting feature
+**Root Cause Analysis**: Identify why the conflict exists
+**Constitutional Review**: Determine if principle applies or requires clarification
+**Resolution Path**: Either modify implementation or formally amend constitution
+**Documentation**: Record decision rationale for future reference
 
 ### Implementation Guidelines
 Every development phase must include:
@@ -144,9 +146,9 @@ Constitutional amendments require:
 
 ### Versioning Policy
 Constitution versioning follows semantic versioning (MAJOR.MINOR.PATCH):
-- MAJOR: Backward incompatible governance/principle removals or redefinitions
-- MINOR: New principle/section added or materially expanded guidance
-- PATCH: Clarifications, wording, typo fixes, non-semantic refinements
+- **MAJOR**: Backward incompatible governance/principle removals or redefinitions
+- **MINOR**: New principle/section added or materially expanded guidance
+- **PATCH**: Clarifications, wording, typo fixes, non-semantic refinements
 
 ### Compliance Review
 - All PRs/reviews must verify constitutional compliance
@@ -155,4 +157,4 @@ Constitution versioning follows semantic versioning (MAJOR.MINOR.PATCH):
 
 This constitution serves as the immutable foundation for all technical and product decisions. When in doubt, optimize for the field worker using the app in challenging conditions with critical documentation needs.
 
-**Version**: 1.0.0 | **Ratified**: 2025-09-28 | **Last Amended**: 2025-09-28
+**Version**: 1.0.1 | **Ratified**: 2025-09-28 | **Last Amended**: 2025-10-11

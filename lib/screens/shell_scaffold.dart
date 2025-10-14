@@ -39,37 +39,14 @@ class ShellScaffold extends StatelessWidget {
       body: child,
       bottomNavigationBar: BottomNav(currentIndex: currentIndex),
       floatingActionButton: fab,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   void _showCameraOptions(BuildContext context) {
-    // For now, show a message that user needs to navigate to equipment first
-    // In a real app, this could show recent equipment or allow quick selection
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Take a Photo',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Navigate to an equipment item to capture photos',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      ),
-    );
+    // T014: Launch camera with home context for quick capture
+    context.push('/camera-capture', extra: {
+      'context': 'home',
+    });
   }
 }

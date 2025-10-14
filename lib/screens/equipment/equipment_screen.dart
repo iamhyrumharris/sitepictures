@@ -11,6 +11,7 @@ import '../../providers/navigation_state.dart' as nav_state;
 import '../../providers/folder_provider.dart';
 import '../../widgets/breadcrumb_navigation.dart';
 import '../../widgets/create_folder_dialog.dart';
+import '../../widgets/bottom_nav.dart';
 import '../../services/recent_locations_service.dart';
 import 'all_photos_tab.dart';
 import 'folders_tab.dart';
@@ -70,18 +71,30 @@ class _EquipmentScreenState extends State<EquipmentScreen>
       SubSite? subSite;
 
       if (equipment != null) {
-        if (equipment.mainSiteId != null) {
+        if (equipment.clientId != null) {
+          // Equipment belongs directly to a client
+          client = await appState.getClient(equipment.clientId!);
+        } else if (equipment.mainSiteId != null) {
+          // Equipment belongs to a main site
           mainSite = await appState.getMainSite(equipment.mainSiteId!);
           if (mainSite != null) {
             client = await appState.getClient(mainSite.clientId);
           }
         } else if (equipment.subSiteId != null) {
+          // Equipment belongs to a subsite
           subSite = await appState.getSubSite(equipment.subSiteId!);
           if (subSite != null) {
-            mainSite = await appState.getMainSite(subSite.mainSiteId);
-            if (mainSite != null) {
-              client = await appState.getClient(mainSite.clientId);
+            // SubSite can belong to client, mainSite, or parent subsite
+            if (subSite.mainSiteId != null) {
+              mainSite = await appState.getMainSite(subSite.mainSiteId!);
+              if (mainSite != null) {
+                client = await appState.getClient(mainSite.clientId);
+              }
+            } else if (subSite.clientId != null) {
+              client = await appState.getClient(subSite.clientId!);
             }
+            // Note: We're not traversing parent subsites for breadcrumbs
+            // as that would require recursive lookups
           }
         }
       }
@@ -142,7 +155,9 @@ class _EquipmentScreenState extends State<EquipmentScreen>
           Expanded(child: _buildBody()),
         ],
       ),
+      bottomNavigationBar: const BottomNav(currentIndex: -1),
       floatingActionButton: _buildFAB(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -318,7 +333,11 @@ class _EquipmentScreenState extends State<EquipmentScreen>
   }
 
   void _openQuickCapture() async {
-    final result = await context.push('/camera-capture');
+    // T015: Launch camera with equipment all photos context
+    final result = await context.push('/camera-capture', extra: {
+      'context': 'equipment-all-photos',
+      'equipmentId': widget.equipmentId,
+    });
     if (result != null && mounted) {
       // Tabs will handle their own refresh via providers
     }
