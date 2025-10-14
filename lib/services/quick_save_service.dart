@@ -26,22 +26,31 @@ class QuickSaveService {
 
   /// Execute Quick Save operation for photos from home camera context
   Future<SaveResult> quickSave(List<TempPhoto> photos) async {
+    final startTime = DateTime.now();
+    print('QuickSave: Starting operation for ${photos.length} photo(s)');
+
     if (photos.isEmpty) {
+      print('QuickSave: ERROR - No photos to save');
       return SaveResult.criticalFailure(error: 'No photos to save');
     }
 
     try {
       // Validate storage availability
+      print('QuickSave: Validating storage availability...');
       final hasStorage = await hasStorageAvailable(photos);
       if (!hasStorage) {
+        print('QuickSave: ERROR - Insufficient storage space');
         return SaveResult.criticalFailure(
           error: 'Insufficient storage space',
           sessionPreserved: true,
         );
       }
+      print('QuickSave: Storage validation passed');
 
       // Get global equipment ID for "Needs Assigned" client
+      print('QuickSave: Getting global equipment ID...');
       final globalEquipmentId = await _getOrCreateGlobalEquipment();
+      print('QuickSave: Using global equipment ID: $globalEquipmentId');
 
       // Generate base name with current date
       final now = DateTime.now();
@@ -51,28 +60,36 @@ class QuickSaveService {
           : 'Folder - $dateStr';
 
       // Get unique name with sequential numbering
+      print('QuickSave: Generating unique name from base: "$baseName"');
       final uniqueName = await generateUniqueName(
         baseName: baseName,
         itemType: photos.length == 1
             ? QuickSaveType.singlePhoto
             : QuickSaveType.folder,
       );
+      print('QuickSave: Generated unique name: "$uniqueName"');
 
       String? folderId;
 
       // Create folder if multiple photos
       if (photos.length > 1) {
+        print('QuickSave: Creating folder for ${photos.length} photos...');
         folderId = await _createFolder(
           equipmentId: globalEquipmentId,
           name: uniqueName,
         );
+        print('QuickSave: Folder created with ID: $folderId');
       }
 
       // Save photos incrementally
+      print('QuickSave: Starting incremental save of ${photos.length} photo(s)...');
       final savedIds = <String>[];
       final failedIds = <String>[];
 
-      for (final tempPhoto in photos) {
+      for (int i = 0; i < photos.length; i++) {
+        final tempPhoto = photos[i];
+        print('QuickSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id})');
+
         try {
           await _savePhoto(
             tempPhoto: tempPhoto,
@@ -81,17 +98,25 @@ class QuickSaveService {
             beforeAfter: folderId != null ? 'before' : null,
           );
           savedIds.add(tempPhoto.id);
+          print('QuickSave: Successfully saved photo ${tempPhoto.id}');
         } catch (e) {
           // Non-critical error: log and continue
-          print('Failed to save photo ${tempPhoto.id}: $e');
+          print('QuickSave: ERROR - Failed to save photo ${tempPhoto.id}: $e');
           failedIds.add(tempPhoto.id);
         }
       }
 
+      // Calculate elapsed time
+      final elapsed = DateTime.now().difference(startTime);
+      print('QuickSave: Operation completed in ${elapsed.inMilliseconds}ms');
+      print('QuickSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed');
+
       // Return result based on outcome
       if (failedIds.isEmpty) {
+        print('QuickSave: SUCCESS - All photos saved to "$uniqueName"');
         return SaveResult.complete(savedIds);
       } else {
+        print('QuickSave: PARTIAL - Some photos failed to save');
         return SaveResult.partial(
           successful: savedIds.length,
           failed: failedIds.length,
@@ -100,6 +125,8 @@ class QuickSaveService {
       }
     } catch (e) {
       // Critical error: preserve session
+      print('QuickSave: CRITICAL ERROR - Operation failed: $e');
+      print('QuickSave: Session preserved for retry');
       return SaveResult.criticalFailure(
         error: e.toString(),
         sessionPreserved: true,

@@ -45,21 +45,30 @@ class PhotoSaveService {
     required List<TempPhoto> photos,
     required Equipment equipment,
   }) async {
+    final startTime = DateTime.now();
+    print('PhotoSave: Starting saveToEquipment for ${photos.length} photo(s)');
+    print('PhotoSave: Target equipment: ${equipment.name} (ID: ${equipment.id})');
+
     if (photos.isEmpty) {
+      print('PhotoSave: ERROR - No photos to save');
       return SaveResult.criticalFailure(error: 'No photos to save');
     }
 
     try {
       // Validate storage availability
+      print('PhotoSave: Validating storage availability...');
       final hasStorage = await hasStorageAvailable(photos);
       if (!hasStorage) {
+        print('PhotoSave: ERROR - Insufficient storage space');
         return SaveResult.criticalFailure(
           error: 'Insufficient storage space',
           sessionPreserved: true,
         );
       }
+      print('PhotoSave: Storage validation passed');
 
       // Verify equipment still exists
+      print('PhotoSave: Verifying equipment exists...');
       final db = await _db.database;
       final equipmentCheck = await db.query(
         'equipment',
@@ -68,13 +77,16 @@ class PhotoSaveService {
       );
 
       if (equipmentCheck.isEmpty) {
+        print('PhotoSave: ERROR - Equipment no longer exists or is inactive');
         return SaveResult.criticalFailure(
           error: 'Equipment no longer exists',
           sessionPreserved: true,
         );
       }
+      print('PhotoSave: Equipment verification passed');
 
       // Save photos incrementally
+      print('PhotoSave: Starting incremental save...');
       final savedIds = <String>[];
       final failedIds = <String>[];
 
@@ -88,23 +100,33 @@ class PhotoSaveService {
           currentPhotoId: tempPhoto.id,
         ));
 
+        print('PhotoSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id})');
+
         try {
           await _savePhotoToEquipment(
             tempPhoto: tempPhoto,
             equipmentId: equipment.id,
           );
           savedIds.add(tempPhoto.id);
+          print('PhotoSave: Successfully saved photo ${tempPhoto.id}');
         } catch (e) {
           // Non-critical error: log and continue
-          print('Failed to save photo ${tempPhoto.id}: $e');
+          print('PhotoSave: ERROR - Failed to save photo ${tempPhoto.id}: $e');
           failedIds.add(tempPhoto.id);
         }
       }
 
+      // Calculate elapsed time
+      final elapsed = DateTime.now().difference(startTime);
+      print('PhotoSave: Operation completed in ${elapsed.inMilliseconds}ms');
+      print('PhotoSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed');
+
       // Return result based on outcome
       if (failedIds.isEmpty) {
+        print('PhotoSave: SUCCESS - All photos saved to equipment "${equipment.name}"');
         return SaveResult.complete(savedIds);
       } else {
+        print('PhotoSave: PARTIAL - Some photos failed to save');
         return SaveResult.partial(
           successful: savedIds.length,
           failed: failedIds.length,
@@ -113,6 +135,8 @@ class PhotoSaveService {
       }
     } catch (e) {
       // Critical error: preserve session
+      print('PhotoSave: CRITICAL ERROR - saveToEquipment failed: $e');
+      print('PhotoSave: Session preserved for retry');
       return SaveResult.criticalFailure(
         error: e.toString(),
         sessionPreserved: true,
@@ -126,21 +150,32 @@ class PhotoSaveService {
     required PhotoFolder folder,
     required BeforeAfter category,
   }) async {
+    final startTime = DateTime.now();
+    final categoryStr = category == BeforeAfter.before ? 'Before' : 'After';
+    print('PhotoSave: Starting saveToFolder for ${photos.length} photo(s)');
+    print('PhotoSave: Target folder: ${folder.name} (ID: ${folder.id})');
+    print('PhotoSave: Category: $categoryStr');
+
     if (photos.isEmpty) {
+      print('PhotoSave: ERROR - No photos to save');
       return SaveResult.criticalFailure(error: 'No photos to save');
     }
 
     try {
       // Validate storage availability
+      print('PhotoSave: Validating storage availability...');
       final hasStorage = await hasStorageAvailable(photos);
       if (!hasStorage) {
+        print('PhotoSave: ERROR - Insufficient storage space');
         return SaveResult.criticalFailure(
           error: 'Insufficient storage space',
           sessionPreserved: true,
         );
       }
+      print('PhotoSave: Storage validation passed');
 
       // Verify folder still exists
+      print('PhotoSave: Verifying folder exists...');
       final db = await _db.database;
       final folderCheck = await db.query(
         'photo_folders',
@@ -149,13 +184,16 @@ class PhotoSaveService {
       );
 
       if (folderCheck.isEmpty) {
+        print('PhotoSave: ERROR - Folder was deleted during capture');
         return SaveResult.criticalFailure(
           error: 'Folder was deleted during capture',
           sessionPreserved: true,
         );
       }
+      print('PhotoSave: Folder verification passed');
 
       // Save photos incrementally
+      print('PhotoSave: Starting incremental save to $categoryStr...');
       final savedIds = <String>[];
       final failedIds = <String>[];
 
@@ -169,6 +207,8 @@ class PhotoSaveService {
           currentPhotoId: tempPhoto.id,
         ));
 
+        print('PhotoSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id}) to $categoryStr');
+
         try {
           await _savePhotoToFolder(
             tempPhoto: tempPhoto,
@@ -177,17 +217,25 @@ class PhotoSaveService {
             category: category,
           );
           savedIds.add(tempPhoto.id);
+          print('PhotoSave: Successfully saved photo ${tempPhoto.id}');
         } catch (e) {
           // Non-critical error: log and continue
-          print('Failed to save photo ${tempPhoto.id}: $e');
+          print('PhotoSave: ERROR - Failed to save photo ${tempPhoto.id}: $e');
           failedIds.add(tempPhoto.id);
         }
       }
 
+      // Calculate elapsed time
+      final elapsed = DateTime.now().difference(startTime);
+      print('PhotoSave: Operation completed in ${elapsed.inMilliseconds}ms');
+      print('PhotoSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed');
+
       // Return result based on outcome
       if (failedIds.isEmpty) {
+        print('PhotoSave: SUCCESS - All photos saved to folder "${folder.name}" ($categoryStr)');
         return SaveResult.complete(savedIds);
       } else {
+        print('PhotoSave: PARTIAL - Some photos failed to save');
         return SaveResult.partial(
           successful: savedIds.length,
           failed: failedIds.length,
@@ -196,6 +244,8 @@ class PhotoSaveService {
       }
     } catch (e) {
       // Critical error: preserve session
+      print('PhotoSave: CRITICAL ERROR - saveToFolder failed: $e');
+      print('PhotoSave: Session preserved for retry');
       return SaveResult.criticalFailure(
         error: e.toString(),
         sessionPreserved: true,

@@ -83,7 +83,7 @@
 - [X] T028 Implement non-critical error handling (continue saving remaining photos)
 - [X] T029 Implement critical error handling with rollback in PhotoSaveService
 - [X] T030 Create `SaveProgressIndicator` widget in `lib/widgets/save_progress_indicator.dart` for loading UI during multi-photo saves
-- [ ] T031 Add logging for all save operations in QuickSaveService and PhotoSaveService (FR-056)
+- [X] T031 Add logging for all save operations in QuickSaveService and PhotoSaveService (FR-056)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - can capture from home, Quick Save to global "Needs Assigned", or use Next to select equipment
 
