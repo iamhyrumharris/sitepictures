@@ -7,9 +7,14 @@ import '../widgets/camera_preview_overlay.dart';
 import '../widgets/photo_thumbnail_strip.dart';
 import '../widgets/capture_button.dart';
 import '../widgets/context_aware_save_buttons.dart';
+import '../widgets/save_progress_indicator.dart';
 import '../models/folder_photo.dart';
 import '../models/camera_context.dart';
 import '../services/folder_service.dart';
+import '../services/quick_save_service.dart';
+import '../services/photo_save_service.dart';
+import '../services/database_service.dart';
+import '../services/photo_storage_service.dart';
 
 /// Main camera capture screen for work site photo documentation
 /// Supports context-aware save button display based on launch context
@@ -156,17 +161,97 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     }
   }
 
-  /// T010: Home context - Quick Save button handler (preserve existing behavior)
+  /// T014-T015: Home context - Quick Save button handler
   Future<void> _handleQuickSave(BuildContext context) async {
     final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
-    provider.completeSession();
+
+    // Validate that we have photos
+    if (!provider.hasPhotos) {
+      return;
+    }
 
     // Close modal
     Navigator.of(context).pop();
 
-    // Return photos to caller (existing behavior)
-    if (mounted) {
-      Navigator.of(context).pop(provider.session.photos);
+    // Initialize Quick Save service
+    final quickSaveService = QuickSaveService(
+      databaseService: DatabaseService(),
+      storageService: PhotoStorageService(),
+    );
+
+    // Show loading dialog
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          color: Colors.white,
+        ),
+      ),
+    );
+
+    try {
+      // Execute Quick Save
+      final result = await quickSaveService.quickSave(provider.session.photos);
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show result message
+      if (!mounted) return;
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.getUserMessage()),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Complete session and return to home
+        provider.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else if (result.successfulCount > 0) {
+        // Partial save
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.getUserMessage()),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        provider.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        // Critical failure with session preserved
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Save failed'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        if (!result.sessionPreserved) {
+          provider.completeSession();
+          if (mounted) Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Quick Save failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 

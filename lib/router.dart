@@ -15,6 +15,7 @@ import 'providers/photo_capture_provider.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/shell_scaffold.dart';
 import 'screens/equipment/folder_detail_screen.dart';
+import 'screens/needs_assigned_page.dart';
 import 'services/auth_service.dart';
 import 'services/database_service.dart';
 import 'providers/auth_state.dart';
@@ -78,6 +79,13 @@ class AppRouter {
             path: '/search',
             name: 'search',
             builder: (context, state) => const SearchScreen(),
+          ),
+
+          // T017: Needs Assigned page (accessible via header button)
+          GoRoute(
+            path: '/needs-assigned',
+            name: 'needsAssigned',
+            builder: (context, state) => const NeedsAssignedPage(),
           ),
 
           // Map
@@ -256,6 +264,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         title: const Text('Ziatech'),
         backgroundColor: const Color(0xFF4A90E2),
         actions: [
+          // T017: Needs Assigned button
+          IconButton(
+            icon: const Icon(Icons.inbox),
+            onPressed: () => context.push('/needs-assigned'),
+            tooltip: 'Needs Assigned',
+          ),
           // Add Client button (moved from FAB to avoid conflict with camera FAB)
           if (authState.hasPermission('create'))
             IconButton(
