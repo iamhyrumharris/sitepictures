@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/photo_capture_provider.dart';
+import '../providers/equipment_navigator_provider.dart';
 import '../widgets/camera_preview_overlay.dart';
 import '../widgets/photo_thumbnail_strip.dart';
 import '../widgets/capture_button.dart';
@@ -10,11 +11,13 @@ import '../widgets/context_aware_save_buttons.dart';
 import '../widgets/save_progress_indicator.dart';
 import '../models/folder_photo.dart';
 import '../models/camera_context.dart';
+import '../models/equipment.dart';
 import '../services/folder_service.dart';
 import '../services/quick_save_service.dart';
 import '../services/photo_save_service.dart';
 import '../services/database_service.dart';
 import '../services/photo_storage_service.dart';
+import '../screens/equipment_navigator_page.dart';
 
 /// Main camera capture screen for work site photo documentation
 /// Supports context-aware save button display based on launch context
@@ -147,17 +150,118 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     );
   }
 
-  /// T010: Home context - Next button handler (preserve existing behavior)
+  /// T022-T023: Home context - Next button handler with equipment navigator
   Future<void> _handleNext(BuildContext context) async {
     final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
-    provider.completeSession();
+
+    // Validate that we have photos
+    if (!provider.hasPhotos) {
+      return;
+    }
 
     // Close modal
     Navigator.of(context).pop();
 
-    // Return photos to caller (existing behavior)
-    if (mounted) {
-      Navigator.of(context).pop(provider.session.photos);
+    // Open equipment navigator in a separate provider context
+    if (!mounted) return;
+    final equipment = await Navigator.of(context).push<Equipment>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => EquipmentNavigatorProvider(),
+          child: const EquipmentNavigatorPage(),
+        ),
+      ),
+    );
+
+    // If user cancelled navigation, preserve session
+    if (equipment == null) {
+      return;
+    }
+
+    // Initialize services for save
+    final photoSaveService = PhotoSaveService(
+      databaseService: DatabaseService(),
+      storageService: PhotoStorageService(),
+    );
+
+    // Show loading dialog with progress indicator
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SaveProgressDialog(
+        progressStream: photoSaveService.progressStream,
+        title: 'Saving to ${equipment.name}',
+      ),
+    );
+
+    try {
+      // Save photos to selected equipment
+      final result = await photoSaveService.saveToEquipment(
+        photos: provider.session.photos,
+        equipment: equipment,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show result message
+      if (!mounted) return;
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.getUserMessage()),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Complete session and return to home
+        provider.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else if (result.successfulCount > 0) {
+        // Partial save
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.getUserMessage()),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        provider.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        // Critical failure
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Save failed'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        if (!result.sessionPreserved) {
+          provider.completeSession();
+          if (mounted) Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      photoSaveService.dispose();
     }
   }
 

@@ -68,13 +68,13 @@
 
 **Next Button / Equipment Navigator Workflow**:
 
-- [ ] T019 Create `EquipmentNavigatorProvider` implementation in `lib/providers/equipment_navigator_provider.dart` per contract (initialize, navigateInto, navigateBack, selectEquipment methods)
-- [ ] T020 Create `EquipmentNavigatorPage` in `lib/screens/equipment_navigator_page.dart` with hierarchical list navigation UI
-- [ ] T021 Create `EquipmentNavigatorTree` widget in `lib/widgets/equipment_navigator_tree.dart` for rendering navigation nodes
-- [ ] T022 Implement Next button handler in `lib/screens/camera_capture_page.dart` that opens equipment navigator modal
-- [ ] T023 Implement equipment selection callback that saves photos via PhotoSaveService.saveToEquipment
-- [ ] T024 Add empty state handling in EquipmentNavigatorPage when no clients exist
-- [ ] T025 Add cancel navigation handling that preserves camera session (FR-019)
+- [X] T019 Create `EquipmentNavigatorProvider` implementation in `lib/providers/equipment_navigator_provider.dart` per contract (initialize, navigateInto, navigateBack, selectEquipment methods)
+- [X] T020 Create `EquipmentNavigatorPage` in `lib/screens/equipment_navigator_page.dart` with hierarchical list navigation UI
+- [X] T021 Create `EquipmentNavigatorTree` widget in `lib/widgets/equipment_navigator_tree.dart` for rendering navigation nodes
+- [X] T022 Implement Next button handler in `lib/screens/camera_capture_page.dart` that opens equipment navigator modal
+- [X] T023 Implement equipment selection callback that saves photos via PhotoSaveService.saveToEquipment
+- [X] T024 Add empty state handling in EquipmentNavigatorPage when no clients exist
+- [X] T025 Add cancel navigation handling that preserves camera session (FR-019)
 
 **Save Service Integration**:
 
