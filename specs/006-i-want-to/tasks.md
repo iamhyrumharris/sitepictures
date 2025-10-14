@@ -97,12 +97,12 @@
 
 ### Implementation for User Story 2
 
-- [ ] T032 Extend `CameraCapturePage` in `lib/screens/camera_capture_page.dart` to detect equipment context and auto-save on Done (no modal)
-- [ ] T033 Update `AllPhotosTab` in `lib/screens/equipment/all_photos_tab.dart` to pass `SaveContext.equipment()` when launching camera
-- [ ] T034 Implement equipment direct save handler in `lib/screens/camera_capture_page.dart` using PhotoSaveService.saveToEquipment
-- [ ] T035 Add success confirmation message showing photo count (e.g., "3 photos saved")
-- [ ] T036 Return user to equipment's All Photos tab after save completes
-- [ ] T037 Refresh All Photos list to show newly saved photos at top (ordered by timestamp)
+- [X] T032 Extend `CameraCapturePage` in `lib/screens/camera_capture_page.dart` to detect equipment context and auto-save on Done (no modal)
+- [X] T033 Update `AllPhotosTab` in `lib/screens/equipment/all_photos_tab.dart` to pass `SaveContext.equipment()` when launching camera
+- [X] T034 Implement equipment direct save handler in `lib/screens/camera_capture_page.dart` using PhotoSaveService.saveToEquipment
+- [X] T035 Add success confirmation message showing photo count (e.g., "3 photos saved")
+- [X] T036 Return user to equipment's All Photos tab after save completes
+- [X] T037 Refresh All Photos list to show newly saved photos at top (ordered by timestamp)
 
 **Checkpoint**: User Story 2 complete - equipment Photos tab camera saves directly without additional navigation
 
@@ -116,42 +116,42 @@
 
 ### Implementation for User Story 3
 
-- [ ] T038 Implement `saveToFolder()` method in PhotoSaveService with before/after categorization per contract
-- [ ] T039 Extend `CameraCapturePage` in `lib/screens/camera_capture_page.dart` to detect folder_before/folder_after context and auto-save on Done
-- [ ] T040 Update `FolderDetailScreen` Before tab in `lib/screens/equipment/folder_detail_screen.dart` to pass `SaveContext.folderBefore()` when launching camera
-- [ ] T041 Update `FolderDetailScreen` After tab in `lib/screens/equipment/folder_detail_screen.dart` to pass `SaveContext.folderAfter()` when launching camera
-- [ ] T042 Implement folder save handler in `lib/screens/camera_capture_page.dart` using PhotoSaveService.saveToFolder
-- [ ] T043 Add success confirmation showing category (e.g., "2 photos saved to Before")
-- [ ] T044 Return user to folder tab from which camera was launched
-- [ ] T045 Refresh Before/After photo lists to show newly saved photos at top
+- [X] T038 Implement `saveToFolder()` method in PhotoSaveService with before/after categorization per contract
+- [X] T039 Extend `CameraCapturePage` in `lib/screens/camera_capture_page.dart` to detect folder_before/folder_after context and auto-save on Done
+- [X] T040 Update `FolderDetailScreen` Before tab in `lib/screens/equipment/folder_detail_screen.dart` to pass `SaveContext.folderBefore()` when launching camera
+- [X] T041 Update `FolderDetailScreen` After tab in `lib/screens/equipment/folder_detail_screen.dart` to pass `SaveContext.folderAfter()` when launching camera
+- [X] T042 Implement folder save handler in `lib/screens/camera_capture_page.dart` using PhotoSaveService.saveToFolder
+- [X] T043 Add success confirmation showing category (e.g., "2 photos saved to Before")
+- [X] T044 Return user to folder tab from which camera was launched
+- [X] T045 Refresh Before/After photo lists to show newly saved photos at top
 
 **Error Handling for US3**:
 
-- [ ] T046 Detect folder deletion during capture session and offer alternative save (FR-053)
-- [ ] T047 Update folder photo count in Folders tab list after save
+- [X] T046 Detect folder deletion during capture session and offer alternative save (FR-053)
+- [X] T047 Update folder photo count in Folders tab list after save
 
 **Checkpoint**: All three user stories complete - all save contexts working (home, equipment, folder before/after)
 
 ---
 
-## Phase 6: Per-Client "Needs Assigned" Folders (Priority: P4)
+## Phase 6: Per-Client "Needs Assigned" Folders (Priority: P4) ❌ **REMOVED**
 
-**Goal**: Automatically create and manage per-client "Needs Assigned" folders
+**Status**: This phase was implemented but subsequently removed during development due to UX concerns and constitutional violations (Article VII: Intuitive Simplicity, Article I: Field-First). The per-client approach created confusion with empty main sites showing "create subsite/equipment" prompts. The specification was updated to use only a simple global "Needs Assigned" folder.
 
-**Independent Test**: Create a new client, verify "Needs Assigned" folder appears at top of main sites list with unique icon
+**Reason for Removal**: Per-client "Needs Assigned" main sites had no clear workflow to populate them, resulting in confusing empty states for users. The simpler approach of a single global "Needs Assigned" folder better serves the use case.
 
-### Implementation for Per-Client Folders
+### ~~Implementation for Per-Client Folders~~ (Code Removed)
 
-- [ ] T048 Create `NeedsAssignedProvider` implementation in `lib/providers/needs_assigned_provider.dart` per contract
-- [ ] T049 Implement `createClientNeedsAssigned()` method in NeedsAssignedProvider
-- [ ] T050 Update client creation workflow to call createClientNeedsAssigned after client creation
-- [ ] T051 Update client sites list UI to display per-client "Needs Assigned" at top with NeedsAssignedBadge
-- [ ] T052 Prevent deletion of per-client "Needs Assigned" folders in folder service
-- [ ] T053 Prevent renaming of per-client "Needs Assigned" folders in folder service
-- [ ] T054 Implement `loadClientNeedsAssigned()` method in NeedsAssignedProvider
-- [ ] T055 Update existing clients to have "Needs Assigned" folders (migration/seed script)
+- [X] ~~T048 Create `NeedsAssignedProvider` implementation~~ (simplified to global-only)
+- [X] ~~T049 Implement `createClientNeedsAssigned()` method~~ (removed)
+- [X] ~~T050 Update client creation workflow to auto-create per-client folders~~ (removed)
+- [X] ~~T051 Update client sites list UI to display per-client badge~~ (removed)
+- [X] ~~T052 Prevent deletion of per-client "Needs Assigned" folders~~ (removed)
+- [X] ~~T053 Prevent renaming of per-client "Needs Assigned" folders~~ (removed)
+- [X] ~~T054 Implement `loadClientNeedsAssigned()` method~~ (removed)
+- [X] ~~T055 Update existing clients migration script~~ (removed)
 
-**Checkpoint**: Per-client "Needs Assigned" folders working for organizational hierarchy
+**Related Changes**: FR-027 to FR-032 removed from spec.md, SC-008 removed from success criteria
 
 ---
 
@@ -186,7 +186,7 @@
 - **User Story 1 (Phase 3)**: Depends on Foundational - MVP priority
 - **User Story 2 (Phase 4)**: Depends on Foundational and PhotoSaveService from US1
 - **User Story 3 (Phase 5)**: Depends on Foundational and PhotoSaveService from US1
-- **Per-Client Folders (Phase 6)**: Depends on Foundational - can run parallel with US2/US3
+- **~~Per-Client Folders (Phase 6)~~**: REMOVED - see Phase 6 section for details
 - **Polish (Phase 7)**: Depends on all desired user stories being complete
 
 ### User Story Dependencies
@@ -232,7 +232,6 @@
 **Across User Stories**:
 - Once PhotoSaveService.saveToEquipment is done (T026), US2 can start
 - Once PhotoSaveService foundation exists, US3 can extend in parallel with US2
-- Phase 6 (Per-Client Folders) can run parallel with US2/US3
 
 ---
 
@@ -281,10 +280,9 @@ Task T026-T031: PhotoSaveService implementation
 2. Add User Story 1 → Test independently → Deploy/Demo (MVP!) (~8 hours)
 3. Add User Story 2 → Test independently → Deploy/Demo (~2 hours)
 4. Add User Story 3 → Test independently → Deploy/Demo (~3 hours)
-5. Add Per-Client Folders → Test independently → Deploy/Demo (~3 hours)
-6. Polish phase → Final validation (~3 hours)
+5. Polish phase → Final validation (~3 hours)
 
-**Estimated Total for Full Feature**: ~21.5 hours
+**Estimated Total for Full Feature**: ~18.5 hours
 
 ### Parallel Team Strategy
 
@@ -294,14 +292,13 @@ With multiple developers (after Foundational phase):
 2. Once Foundational is done:
    - **Developer A**: User Story 1 Quick Save path (T013-T018, T026-T031)
    - **Developer B**: User Story 1 Equipment Navigator path (T019-T025)
-   - **Developer C**: Per-Client Folders (Phase 6)
 3. Merge User Story 1 paths together
 4. Then in parallel:
    - **Developer A**: User Story 2 (T032-T037)
    - **Developer B**: User Story 3 (T038-T047)
 5. Polish phase together
 
-**Estimated Total with 3 developers**: ~12 hours elapsed time
+**Estimated Total with 2 developers**: ~10 hours elapsed time
 
 ---
 
@@ -325,13 +322,13 @@ With multiple developers (after Foundational phase):
 ### Phase 5 (User Story 3): ~3 hours
 - T038-T047: Folder before/after save (3 hours)
 
-### Phase 6 (Per-Client Folders): ~3 hours
-- T048-T055: Per-client "Needs Assigned" (3 hours)
+### ~~Phase 6 (Per-Client Folders)~~: REMOVED
+- ~~T048-T055: Per-client "Needs Assigned"~~ (removed during development)
 
 ### Phase 7 (Polish): ~3 hours
 - T056-T070: Documentation, optimization, validation (3 hours)
 
-**Total Estimated Time**: ~21.5 hours (single developer, sequential)
+**Total Estimated Time**: ~18.5 hours (single developer, sequential)
 
 ---
 
@@ -377,9 +374,10 @@ Tasks map to success criteria from spec.md:
 - **SC-005** (100% folder categorization): T038-T047
 - **SC-006** (95% equipment selection success): T019-T025
 - **SC-007** (100% error handling): T028-T029, T046, T059-T060
-- **SC-008** (100% per-client folders): T048-T055
-- **SC-009** (Sequential naming): T009, T013
-- **SC-010** (20 photos <15s): T058, T062, T068
-- **SC-011** (90% understand destination): T031, T064
+- **SC-008** (Sequential naming): T009, T013
+- **SC-009** (20 photos <15s): T058, T062, T068
+- **SC-010** (90% understand destination): T031, T064
 
 All success criteria covered by task list.
+
+**Note**: Original SC-008 (per-client folders) was removed during development - see Phase 6 for details.

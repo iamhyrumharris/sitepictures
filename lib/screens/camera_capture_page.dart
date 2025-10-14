@@ -10,6 +10,7 @@ import '../widgets/capture_button.dart';
 import '../widgets/context_aware_save_buttons.dart';
 import '../widgets/save_progress_indicator.dart';
 import '../models/folder_photo.dart';
+import '../models/photo_folder.dart';
 import '../models/camera_context.dart';
 import '../models/equipment.dart';
 import '../services/folder_service.dart';
@@ -119,12 +120,13 @@ class _CameraCapturePageState extends State<CameraCapturePage>
   }
 
   Future<void> _handleDone(BuildContext context) async {
-    final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
+    // Capture outer context before modal to avoid context scope issues
+    final outerContext = context;
 
     // Render context-aware save buttons based on camera context
     await showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
+      builder: (modalContext) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -138,11 +140,11 @@ class _CameraCapturePageState extends State<CameraCapturePage>
             const SizedBox(height: 16),
             ContextAwareSaveButtons(
               cameraContext: widget.cameraContext,
-              onNext: () => _handleNext(context),
-              onQuickSave: () => _handleQuickSave(context),
-              onEquipmentSave: () => _handleEquipmentSave(context),
-              onBeforeSave: () => _handleBeforeSave(context),
-              onAfterSave: () => _handleAfterSave(context),
+              onNext: () => _handleNext(outerContext),
+              onQuickSave: () => _handleQuickSave(outerContext),
+              onEquipmentSave: () => _handleEquipmentSave(outerContext),
+              onBeforeSave: () => _handleBeforeSave(outerContext),
+              onAfterSave: () => _handleAfterSave(outerContext),
             ),
           ],
         ),
@@ -152,10 +154,8 @@ class _CameraCapturePageState extends State<CameraCapturePage>
 
   /// T022-T023: Home context - Next button handler with equipment navigator
   Future<void> _handleNext(BuildContext context) async {
-    final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
-
-    // Validate that we have photos
-    if (!provider.hasPhotos) {
+    // Use class-level provider reference instead of context to avoid modal scope issues
+    if (_provider == null || !_provider!.hasPhotos) {
       return;
     }
 
@@ -199,7 +199,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     try {
       // Save photos to selected equipment
       final result = await photoSaveService.saveToEquipment(
-        photos: provider.session.photos,
+        photos: _provider!.session.photos,
         equipment: equipment,
       );
 
@@ -217,7 +217,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
         );
 
         // Complete session and return to home
-        provider.completeSession();
+        _provider!.completeSession();
         if (mounted) Navigator.of(context).pop();
       } else if (result.successfulCount > 0) {
         // Partial save
@@ -229,7 +229,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
           ),
         );
 
-        provider.completeSession();
+        _provider!.completeSession();
         if (mounted) Navigator.of(context).pop();
       } else {
         // Critical failure
@@ -242,7 +242,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
         );
 
         if (!result.sessionPreserved) {
-          provider.completeSession();
+          _provider!.completeSession();
           if (mounted) Navigator.of(context).pop();
         }
       }
@@ -267,10 +267,8 @@ class _CameraCapturePageState extends State<CameraCapturePage>
 
   /// T014-T015: Home context - Quick Save button handler
   Future<void> _handleQuickSave(BuildContext context) async {
-    final provider = Provider.of<PhotoCaptureProvider>(context, listen: false);
-
-    // Validate that we have photos
-    if (!provider.hasPhotos) {
+    // Use class-level provider reference instead of context to avoid modal scope issues
+    if (_provider == null || !_provider!.hasPhotos) {
       return;
     }
 
@@ -297,7 +295,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
 
     try {
       // Execute Quick Save
-      final result = await quickSaveService.quickSave(provider.session.photos);
+      final result = await quickSaveService.quickSave(_provider!.session.photos);
 
       // Close loading dialog
       if (mounted) Navigator.of(context).pop();
@@ -313,7 +311,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
         );
 
         // Complete session and return to home
-        provider.completeSession();
+        _provider!.completeSession();
         if (mounted) Navigator.of(context).pop();
       } else if (result.successfulCount > 0) {
         // Partial save
@@ -325,7 +323,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
           ),
         );
 
-        provider.completeSession();
+        _provider!.completeSession();
         if (mounted) Navigator.of(context).pop();
       } else {
         // Critical failure with session preserved
@@ -338,7 +336,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
         );
 
         if (!result.sessionPreserved) {
-          provider.completeSession();
+          _provider!.completeSession();
           if (mounted) Navigator.of(context).pop();
         }
       }
@@ -359,66 +357,298 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     }
   }
 
-  /// T011: Equipment all photos context - Mock save handler
-  void _handleEquipmentSave(BuildContext context) {
-    // Close modal
-    Navigator.of(context).pop();
+  /// T032-T034: Equipment context - Direct save to equipment's All Photos
+  Future<void> _handleEquipmentSave(BuildContext context) async {
+    // Use class-level provider reference instead of context to avoid modal scope issues
+    if (_provider == null || !_provider!.hasPhotos) {
+      return;
+    }
 
-    // Show placeholder message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Equipment photo save coming soon!\n'
-          'Photos captured in this session will be available in the gallery.',
+    // Validate equipment ID exists in context
+    if (widget.cameraContext.equipmentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Equipment ID missing from context'),
+          backgroundColor: Colors.red,
         ),
-        duration: Duration(seconds: 3),
-        backgroundColor: Colors.blue,
-      ),
-    );
-
-    // Return to previous screen
-    if (mounted) {
-      Navigator.of(context).pop();
+      );
+      return;
     }
-  }
 
-  /// T012: Equipment before context - Mock save handler
-  void _handleBeforeSave(BuildContext context) {
     // Close modal
     Navigator.of(context).pop();
 
-    // Show placeholder message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Before/After categorization coming soon!'),
-        duration: Duration(seconds: 3),
-        backgroundColor: Colors.orange,
+    // Fetch equipment from database
+    final db = await DatabaseService().database;
+    final equipmentMaps = await db.query(
+      'equipment',
+      where: 'id = ?',
+      whereArgs: [widget.cameraContext.equipmentId],
+    );
+
+    if (equipmentMaps.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Equipment not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final equipment = Equipment.fromMap(equipmentMaps.first);
+
+    // Initialize save service
+    final photoSaveService = PhotoSaveService(
+      databaseService: DatabaseService(),
+      storageService: PhotoStorageService(),
+    );
+
+    // Show loading dialog with progress indicator (FR-057)
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SaveProgressDialog(
+        progressStream: photoSaveService.progressStream,
+        title: 'Saving to ${equipment.name}',
       ),
     );
 
-    // Return to previous screen
-    if (mounted) {
-      Navigator.of(context).pop();
+    try {
+      // T034: Save photos directly to equipment (no folder association)
+      final result = await photoSaveService.saveToEquipment(
+        photos: _provider!.session.photos,
+        equipment: equipment,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // T035: Show result message with photo count (FR-058, FR-059)
+      if (!mounted) return;
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.getUserMessage()),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Complete session and return to equipment's All Photos tab (T036)
+        _provider!.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else if (result.successfulCount > 0) {
+        // Partial save (FR-055b)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.getUserMessage()),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        _provider!.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        // Critical failure (FR-055c)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Save failed'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        // Only close if session not preserved for retry
+        if (!result.sessionPreserved) {
+          _provider!.completeSession();
+          if (mounted) Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      photoSaveService.dispose();
     }
   }
 
-  /// T013: Equipment after context - Mock save handler
-  void _handleAfterSave(BuildContext context) {
+  /// T039, T042: Folder Before context - Direct save to folder's Before section
+  Future<void> _handleBeforeSave(BuildContext context) async {
+    await _handleFolderSave(context, BeforeAfter.before);
+  }
+
+  /// T039, T042: Folder After context - Direct save to folder's After section
+  Future<void> _handleAfterSave(BuildContext context) async {
+    await _handleFolderSave(context, BeforeAfter.after);
+  }
+
+  /// T042: Generic folder save handler for before/after categorization
+  Future<void> _handleFolderSave(
+    BuildContext context,
+    BeforeAfter category,
+  ) async {
+    // Use class-level provider reference instead of context to avoid modal scope issues
+    if (_provider == null || !_provider!.hasPhotos) {
+      return;
+    }
+
+    // Validate folder ID exists in context
+    if (widget.cameraContext.folderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Folder ID missing from context'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Close modal
     Navigator.of(context).pop();
 
-    // Show placeholder message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Before/After categorization coming soon!'),
-        duration: Duration(seconds: 3),
-        backgroundColor: Colors.green,
+    // Fetch folder from database
+    final db = await DatabaseService().database;
+    final folderMaps = await db.query(
+      'photo_folders',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [widget.cameraContext.folderId],
+    );
+
+    // T046: Detect folder deletion during capture session
+    if (folderMaps.isEmpty) {
+      if (!mounted) return;
+
+      // Show error and offer alternative save options
+      final shouldSaveToEquipment = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Folder Deleted'),
+          content: const Text(
+            'The folder was deleted while you were capturing photos. '
+            'Would you like to save these photos to the equipment\'s All Photos instead?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save to Equipment'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldSaveToEquipment == true && widget.cameraContext.equipmentId != null) {
+        // Fallback: save to equipment's All Photos
+        return _handleEquipmentSave(context);
+      }
+      return;
+    }
+
+    final folder = PhotoFolder.fromMap(folderMaps.first);
+    final categoryStr = category == BeforeAfter.before ? 'Before' : 'After';
+
+    // Initialize save service
+    final photoSaveService = PhotoSaveService(
+      databaseService: DatabaseService(),
+      storageService: PhotoStorageService(),
+    );
+
+    // Show loading dialog with progress indicator (FR-057)
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SaveProgressDialog(
+        progressStream: photoSaveService.progressStream,
+        title: 'Saving to $categoryStr',
       ),
     );
 
-    // Return to previous screen
-    if (mounted) {
-      Navigator.of(context).pop();
+    try {
+      // T042: Save photos to folder with before/after categorization
+      final result = await photoSaveService.saveToFolder(
+        photos: _provider!.session.photos,
+        folder: folder,
+        category: category,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // T043: Show result message with category (e.g., "2 photos saved to Before")
+      if (!mounted) return;
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${result.successfulCount} ${result.successfulCount == 1 ? 'photo' : 'photos'} saved to $categoryStr'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Complete session and return to folder tab (T044)
+        _provider!.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else if (result.successfulCount > 0) {
+        // Partial save (FR-055b)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${result.successfulCount} of ${result.successfulCount + result.failedCount} photos saved to $categoryStr'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        _provider!.completeSession();
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        // Critical failure (FR-055c)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Save failed'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        // Only close if session not preserved for retry
+        if (!result.sessionPreserved) {
+          _provider!.completeSession();
+          if (mounted) Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      photoSaveService.dispose();
     }
   }
 

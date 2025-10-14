@@ -42,14 +42,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final authState = context.read<AuthState>();
       final userId = authState.currentUser?.id;
 
-      // Load clients
+      // Load clients (exclude system clients like GLOBAL_NEEDS_ASSIGNED)
       final clientResults = await db.query(
         'clients',
         where: 'is_active = ?',
         whereArgs: [1],
         orderBy: 'name ASC',
       );
-      _clients = clientResults.map((map) => Client.fromMap(map)).toList();
+      _clients = clientResults
+          .map((map) => Client.fromMap(map))
+          .where((client) => !client.isSystem)
+          .toList();
 
       // Load recent locations
       if (userId != null) {

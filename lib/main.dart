@@ -5,6 +5,7 @@ import 'providers/auth_state.dart';
 import 'providers/navigation_state.dart';
 import 'providers/sync_state.dart';
 import 'providers/folder_provider.dart';
+import 'providers/needs_assigned_provider.dart';
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
 import 'services/background_sync_service.dart';
@@ -38,6 +39,7 @@ class SitePicturesApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NavigationState()),
         ChangeNotifierProvider(create: (_) => SyncState()..initialize()),
         ChangeNotifierProvider(create: (_) => FolderProvider()),
+        ChangeNotifierProvider(create: (_) => NeedsAssignedProvider()..loadGlobalNeedsAssigned()),
       ],
       child: MaterialApp.router(
         title: 'Ziatech - Site Pictures',

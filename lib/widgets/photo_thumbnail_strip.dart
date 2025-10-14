@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/photo_session.dart';
 
@@ -38,7 +39,13 @@ class PhotoThumbnailStrip extends StatelessWidget {
                     borderRadius: BorderRadius.circular(2),
                     child: photo.thumbnailData != null
                         ? Image.memory(photo.thumbnailData!, fit: BoxFit.cover)
-                        : const Icon(Icons.image, color: Colors.white),
+                        : Image.file(
+                            File(photo.filePath),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.image, color: Colors.white);
+                            },
+                          ),
                   ),
                 ),
                 // FR-009: X delete overlay

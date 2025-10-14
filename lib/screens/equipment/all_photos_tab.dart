@@ -178,16 +178,11 @@ class _AllPhotosTabState extends State<AllPhotosTab>
             decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius: BorderRadius.circular(8),
-              image: photo.thumbnailPath != null
-                  ? DecorationImage(
-                      image: AssetImage(photo.thumbnailPath!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
             ),
-            child: photo.thumbnailPath == null
-                ? const Icon(Icons.image, size: 40, color: Colors.grey)
-                : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _buildPhotoImage(photo),
+            ),
           ),
 
           // Folder badge if photo is in a folder
@@ -195,6 +190,19 @@ class _AllPhotosTabState extends State<AllPhotosTab>
             FolderBadge(folderName: photo.folderName!),
         ],
       ),
+    );
+  }
+
+  Widget _buildPhotoImage(Photo photo) {
+    // Try thumbnail first, then fall back to full photo
+    final imagePath = photo.thumbnailPath ?? photo.filePath;
+
+    return Image.file(
+      File(imagePath),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return const Icon(Icons.image, size: 40, color: Colors.grey);
+      },
     );
   }
 

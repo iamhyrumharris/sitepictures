@@ -20,6 +20,7 @@ import 'services/auth_service.dart';
 import 'services/database_service.dart';
 import 'providers/auth_state.dart';
 import 'providers/sync_state.dart';
+import 'providers/needs_assigned_provider.dart';
 import 'models/client.dart';
 import 'models/camera_context.dart';
 
@@ -115,6 +116,14 @@ class AppRouter {
       GoRoute(
         path: '/client/:clientId',
         name: 'client',
+        redirect: (context, state) {
+          final clientId = state.pathParameters['clientId']!;
+          // Redirect global "Needs Assigned" to its dedicated page
+          if (clientId == 'GLOBAL_NEEDS_ASSIGNED') {
+            return '/needs-assigned';
+          }
+          return null;
+        },
         builder: (context, state) {
           final clientId = state.pathParameters['clientId']!;
           return ClientDetailScreen(clientId: clientId);
@@ -258,17 +267,26 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   Widget build(BuildContext context) {
     final authState = context.watch<AuthState>();
     final syncState = context.watch<SyncState>();
+    final needsAssignedProvider = context.watch<NeedsAssignedProvider>();
+
+    // Calculate total items needing assignment
+    final needsAssignedCount = needsAssignedProvider.globalPhotos.length +
+                                needsAssignedProvider.globalFolders.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ziatech'),
         backgroundColor: const Color(0xFF4A90E2),
         actions: [
-          // T017: Needs Assigned button
-          IconButton(
-            icon: const Icon(Icons.inbox),
-            onPressed: () => context.push('/needs-assigned'),
-            tooltip: 'Needs Assigned',
+          // T017: Needs Assigned button with badge indicator
+          Badge(
+            label: const Text('!'),
+            isLabelVisible: needsAssignedCount > 0,
+            child: IconButton(
+              icon: const Icon(Icons.inbox),
+              onPressed: () => context.push('/needs-assigned'),
+              tooltip: 'Needs Assigned',
+            ),
           ),
           // Add Client button (moved from FAB to avoid conflict with camera FAB)
           if (authState.hasPermission('create'))

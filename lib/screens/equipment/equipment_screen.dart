@@ -31,6 +31,7 @@ class EquipmentScreen extends StatefulWidget {
 class _EquipmentScreenState extends State<EquipmentScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GlobalKey _allPhotosKey = GlobalKey();
   Client? _client;
   MainSite? _mainSite;
   SubSite? _subSite;
@@ -244,7 +245,7 @@ class _EquipmentScreenState extends State<EquipmentScreen>
     return TabBarView(
       controller: _tabController,
       children: [
-        AllPhotosTab(equipmentId: widget.equipmentId),
+        AllPhotosTab(key: _allPhotosKey, equipmentId: widget.equipmentId),
         FoldersTab(equipmentId: widget.equipmentId),
       ],
     );
@@ -333,13 +334,15 @@ class _EquipmentScreenState extends State<EquipmentScreen>
   }
 
   void _openQuickCapture() async {
-    // T015: Launch camera with equipment all photos context
-    final result = await context.push('/camera-capture', extra: {
+    // T033: Launch camera with equipment all photos context
+    await context.push('/camera-capture', extra: {
       'context': 'equipment-all-photos',
       'equipmentId': widget.equipmentId,
     });
-    if (result != null && mounted) {
-      // Tabs will handle their own refresh via providers
+
+    // T037: Force rebuild to refresh All Photos list
+    if (mounted) {
+      setState(() {});
     }
   }
 }

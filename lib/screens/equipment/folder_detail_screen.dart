@@ -66,22 +66,31 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
     }
   }
 
-  void _capturePhotos() {
+  void _capturePhotos() async {
     final currentTab = _tabController.index;
     final beforeAfter = currentTab == 0
         ? BeforeAfter.before
         : BeforeAfter.after;
 
-    // T016 & T017: Navigate to camera with before/after context
+    // T040-T041: Navigate to camera with before/after context
     final contextStr = currentTab == 0 ? 'equipment-before' : 'equipment-after';
-    context.push(
+    final result = await context.push(
       '/camera-capture',
       extra: {
         'context': contextStr,
         'folderId': widget.folderId,
+        'equipmentId': widget.equipmentId, // Add equipmentId for fallback save
         'beforeAfter': beforeAfter.name,
       },
     );
+
+    // T045: Refresh Before/After photo lists to show newly saved photos
+    if (mounted) {
+      await _loadPhotos();
+
+      // T047: Update folder photo count in Folders tab list
+      // (This would be handled by FolderProvider reloading folder metadata)
+    }
   }
 
   Future<void> _deletePhoto(Photo photo) async {
@@ -263,17 +272,25 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
         decoration: BoxDecoration(
           color: Colors.grey[300],
           borderRadius: BorderRadius.circular(8),
-          image: photo.thumbnailPath != null
-              ? DecorationImage(
-                  image: AssetImage(photo.thumbnailPath!),
-                  fit: BoxFit.cover,
-                )
-              : null,
         ),
-        child: photo.thumbnailPath == null
-            ? const Icon(Icons.image, size: 40, color: Colors.grey)
-            : null,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: _buildPhotoImage(photo),
+        ),
       ),
+    );
+  }
+
+  Widget _buildPhotoImage(Photo photo) {
+    // Try thumbnail first, then fall back to full photo
+    final imagePath = photo.thumbnailPath ?? photo.filePath;
+
+    return Image.file(
+      File(imagePath),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return const Icon(Icons.image, size: 40, color: Colors.grey);
+      },
     );
   }
 

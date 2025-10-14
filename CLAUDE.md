@@ -12,6 +12,8 @@ Auto-generated from all feature plans. Last updated: 2025-09-28
 - SQLite database with existing `photos` table, new `photo_folders` and `folder_photos` junction table (004-i-want-to)
 - Dart 3.8.1 / Flutter SDK 3.24+ + Flutter Framework, provider (state management), go_router (navigation), camera, sqflite (005-i-want-to)
 - SQLite database via sqflite (for organizational data); local file system for photos (005-i-want-to)
+- Dart 3.8.1 / Flutter SDK 3.24+ + Flutter Framework, sqflite (SQLite), provider (state management), camera, go_router (navigation), uuid, intl (006-i-want-to)
+- SQLite database (sqflite) for metadata and associations; local file system for photo files (006-i-want-to)
 
 ## Project Structure
 ```
@@ -26,9 +28,9 @@ tests/
 Flutter/Dart 3.x for cross-platform developmen: Follow standard conventions
 
 ## Recent Changes
+- 006-i-want-to: Added Dart 3.8.1 / Flutter SDK 3.24+ + Flutter Framework, sqflite (SQLite), provider (state management), camera, go_router (navigation), uuid, intl
 - 005-i-want-to: Added Dart 3.8.1 / Flutter SDK 3.24+ + Flutter Framework, provider (state management), go_router (navigation), camera, sqflite
 - 005-i-want-to: Added Dart 3.8.1 / Flutter SDK 3.24+ + Flutter Framework, provider (state management), go_router (navigation), camera, sqflite
-- 004-i-want-to: Added Dart 3.8.1 / Flutter SDK 3.24+ + sqflite (SQLite), provider (state management), camera, go_router, uuid
 
 ## Implementation Notes: Camera Capture Feature (003-specify-feature-work)
 
@@ -72,6 +74,63 @@ All articles validated:
 - Article VI (Performance): Optimized rendering, thumbnail caching ✓
 - Article VII (Intuitive Simplicity): Standard camera UI patterns ✓
 - Article VIII (Modular Independence): Clean separation of concerns ✓
+
+## Implementation Notes: Camera Photo Save Functionality (006-i-want-to)
+
+### Architecture
+- **Services**:
+  - `lib/services/quick_save_service.dart` - Quick Save to global "Needs Assigned" with sequential naming
+  - `lib/services/photo_save_service.dart` - Context-aware save orchestration with incremental save pattern
+- **Providers**:
+  - `lib/providers/needs_assigned_provider.dart` - Global "Needs Assigned" management (simplified to global-only)
+  - `lib/providers/equipment_navigator_provider.dart` - Equipment selection state for Next button workflow
+- **Screens**:
+  - `lib/screens/equipment_navigator_page.dart` - Hierarchical equipment selection for Next button
+  - `lib/screens/needs_assigned_page.dart` - Global "Needs Assigned" folder view
+- **Models**:
+  - `lib/models/quick_save_item.dart` - Result entity for Quick Save operations
+  - `lib/models/equipment_navigation_node.dart` - Tree node for equipment navigator
+  - `lib/utils/sequential_namer.dart` - Handles "(2)", "(3)" disambiguation for same-date saves
+
+### Key Implementation Decisions
+1. **Context-Aware Save**: Camera capture page detects launch context (home, equipment, folder) and determines save behavior
+2. **Quick Save Naming**: Sequential naming with format "Image - YYYY-MM-DD" or "Folder - YYYY-MM-DD" with (2), (3) suffix for duplicates
+3. **Incremental Save Pattern**: Photos saved one-by-one with progress stream; non-critical errors continue saving remaining photos
+4. **Global "Needs Assigned" Only**: Simplified from original per-client approach to single global folder (see Architectural Decisions below)
+5. **Equipment Navigator**: Reuses existing hierarchical navigation UI patterns for equipment selection
+
+### Architectural Decisions
+
+#### Removal of Per-Client "Needs Assigned" (2025-10-14)
+**Decision**: Removed per-client "Needs Assigned" main sites feature during Phase 6 implementation.
+
+**Reasoning**:
+- **UX Confusion**: Per-client "Needs Assigned" main sites showed empty state with "create subsite/equipment" prompt, confusing users who clicked on them
+- **No Workflow**: Specification had no user story to populate per-client folders - they would remain perpetually empty
+- **Constitutional Violations**:
+  - Article VII (Intuitive Simplicity): Empty sites with unclear purpose violated simplicity principle
+  - Article I (Field-First): Added friction instead of reducing it
+
+**Impact**:
+- Removed ~400 lines of code from `app_state.dart`, `client_detail_screen.dart`, `needs_assigned_provider.dart`, and `seed_needs_assigned.dart`
+- Updated specification (FR-027 to FR-032 removed), tasks.md (Phase 6 marked as removed), and architecture docs
+- Simplified to single global "Needs Assigned" folder accessible from home navigation
+
+**Result**: Cleaner, more intuitive UX that aligns with constitution principles and actual user workflows.
+
+### Gotchas
+- Global "Needs Assigned" requires GLOBAL_NEEDS_ASSIGNED client record in database (created in migration 004)
+- Sequential naming checks existing names via database query to avoid collisions
+- Camera context must include equipmentId for folder save operations (for fallback to equipment save if folder deleted)
+- Incremental save may result in partial saves (9 of 10 photos) - UI must handle this gracefully
+
+### Constitutional Compliance
+All articles validated:
+- Article I (Field-First): Quick Save enables immediate storage, minimal navigation friction ✓
+- Article II (Offline Autonomy): All save operations work offline using local SQLite ✓
+- Article III (Data Integrity): Incremental save with rollback, session preservation on critical failure ✓
+- Article VII (Intuitive Simplicity): Context-aware UI, clear confirmation messages, simplified global folder ✓
+- Article VIII (Modular Independence): Clean service separation, extends existing camera feature ✓
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

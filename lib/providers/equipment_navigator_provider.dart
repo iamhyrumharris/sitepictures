@@ -49,7 +49,7 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
         orderBy: 'name ASC',
       );
 
-      _currentChildren = clientMaps.map((map) {
+      _currentChildren = clientMaps.map<EquipmentNavigationNode>((map) {
         final client = Client.fromMap(map);
         return EquipmentNavigationNode.client(
           id: client.id,
@@ -188,14 +188,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(mainSiteMaps.map((map) {
+    children.addAll(mainSiteMaps.map<EquipmentNavigationNode>((map) {
       final site = MainSite.fromMap(map);
       return EquipmentNavigationNode.mainSite(
         id: site.id,
         name: site.name,
         parentId: clientId,
       );
-    }));
+    }).toList());
 
     // Load sub sites directly under client
     final subSiteMaps = await db.query(
@@ -205,14 +205,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(subSiteMaps.map((map) {
+    children.addAll(subSiteMaps.map<EquipmentNavigationNode>((map) {
       final site = SubSite.fromMap(map);
       return EquipmentNavigationNode.subSite(
         id: site.id,
         name: site.name,
         parentId: clientId,
       );
-    }));
+    }).toList());
 
     // Load equipment directly under client
     final equipmentMaps = await db.query(
@@ -222,14 +222,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(equipmentMaps.map((map) {
+    children.addAll(equipmentMaps.map<EquipmentNavigationNode>((map) {
       final equipment = Equipment.fromMap(map);
       return EquipmentNavigationNode.equipment(
         id: equipment.id,
         name: equipment.name,
         parentId: clientId,
       );
-    }));
+    }).toList());
 
     return children;
   }
@@ -246,14 +246,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(subSiteMaps.map((map) {
+    children.addAll(subSiteMaps.map<EquipmentNavigationNode>((map) {
       final site = SubSite.fromMap(map);
       return EquipmentNavigationNode.subSite(
         id: site.id,
         name: site.name,
         parentId: mainSiteId,
       );
-    }));
+    }).toList());
 
     // Load equipment under this main site
     final equipmentMaps = await db.query(
@@ -263,14 +263,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(equipmentMaps.map((map) {
+    children.addAll(equipmentMaps.map<EquipmentNavigationNode>((map) {
       final equipment = Equipment.fromMap(map);
       return EquipmentNavigationNode.equipment(
         id: equipment.id,
         name: equipment.name,
         parentId: mainSiteId,
       );
-    }));
+    }).toList());
 
     return children;
   }
@@ -287,14 +287,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(subSiteMaps.map((map) {
+    children.addAll(subSiteMaps.map<EquipmentNavigationNode>((map) {
       final site = SubSite.fromMap(map);
       return EquipmentNavigationNode.subSite(
         id: site.id,
         name: site.name,
         parentId: subSiteId,
       );
-    }));
+    }).toList());
 
     // Load equipment under this sub site
     final equipmentMaps = await db.query(
@@ -304,14 +304,14 @@ class EquipmentNavigatorProvider extends ChangeNotifier {
       orderBy: 'name ASC',
     );
 
-    children.addAll(equipmentMaps.map((map) {
+    children.addAll(equipmentMaps.map<EquipmentNavigationNode>((map) {
       final equipment = Equipment.fromMap(map);
       return EquipmentNavigationNode.equipment(
         id: equipment.id,
         name: equipment.name,
         parentId: subSiteId,
       );
-    }));
+    }).toList());
 
     return children;
   }

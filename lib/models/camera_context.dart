@@ -36,12 +36,14 @@ class CameraContext {
     } else if (contextStr == 'equipment-before' && folderId != null) {
       return CameraContext(
         type: CameraContextType.equipmentBefore,
+        equipmentId: equipmentId, // Include for fallback save (T046)
         folderId: folderId,
         beforeAfter: 'before',
       );
     } else if (contextStr == 'equipment-after' && folderId != null) {
       return CameraContext(
         type: CameraContextType.equipmentAfter,
+        equipmentId: equipmentId, // Include for fallback save (T046)
         folderId: folderId,
         beforeAfter: 'after',
       );

@@ -93,6 +93,7 @@ class AppState extends ChangeNotifier {
       );
       final db = await _dbService.database;
       await db.insert('clients', client.toMap());
+
       notifyListeners();
     } catch (e) {
       setError('Failed to create client: $e');
@@ -151,6 +152,51 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       setError('Failed to create main site: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMainSite(String siteId) async {
+    try {
+      final db = await _dbService.database;
+
+      // Soft delete
+      await db.update(
+        'main_sites',
+        {'is_active': 0},
+        where: 'id = ?',
+        whereArgs: [siteId],
+      );
+
+      notifyListeners();
+    } catch (e) {
+      setError('Failed to delete main site: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateMainSite(
+    String siteId,
+    String name,
+    String? address,
+  ) async {
+    try {
+      final db = await _dbService.database;
+
+      await db.update(
+        'main_sites',
+        {
+          'name': name,
+          'address': address,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [siteId],
+      );
+
+      notifyListeners();
+    } catch (e) {
+      setError('Failed to update main site: $e');
       rethrow;
     }
   }
