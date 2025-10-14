@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -47,6 +47,7 @@ class DatabaseService {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT,
+        is_system INTEGER DEFAULT 0,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
@@ -231,6 +232,11 @@ class DatabaseService {
 
     // Client name uniqueness
     await db.execute('CREATE UNIQUE INDEX idx_client_name ON clients(name)');
+
+    // System clients filtering
+    await db.execute(
+      'CREATE INDEX idx_clients_system ON clients(is_system, is_active)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -241,6 +247,10 @@ class DatabaseService {
     // Migration 003: Flexible hierarchy for subsites and equipment
     if (oldVersion < 3) {
       await _migration003(db);
+    }
+    // Migration 004: Global "Needs Assigned" support
+    if (oldVersion < 4) {
+      await _migration004(db);
     }
   }
 
@@ -405,6 +415,33 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX idx_equipment_subsite ON equipment(sub_site_id, is_active)',
+    );
+  }
+
+  Future<void> _migration004(Database db) async {
+    // Migration 004: Global "Needs Assigned" Support
+    // Feature: 006-i-want-to
+    // Date: 2025-10-14
+    // Changes: Add is_system column to clients table for special system clients
+
+    // Add system flag to clients table
+    await db.execute('ALTER TABLE clients ADD COLUMN is_system INTEGER DEFAULT 0');
+
+    // Create global "Needs Assigned" client
+    await db.insert('clients', {
+      'id': 'GLOBAL_NEEDS_ASSIGNED',
+      'name': 'Needs Assigned',
+      'description': 'Global holding area for unorganized photos',
+      'is_system': 1,
+      'created_by': 'SYSTEM',
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+      'is_active': 1,
+    });
+
+    // Create index for filtering out system clients from user lists
+    await db.execute(
+      'CREATE INDEX idx_clients_system ON clients(is_system, is_active)',
     );
   }
 

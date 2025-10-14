@@ -4,6 +4,7 @@ class Client {
   final String id;
   final String name;
   final String? description;
+  final bool isSystem;
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -13,6 +14,7 @@ class Client {
     String? id,
     required this.name,
     this.description,
+    this.isSystem = false,
     required this.createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -37,6 +39,7 @@ class Client {
       'id': id,
       'name': name,
       'description': description,
+      'is_system': isSystem ? 1 : 0,
       'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -50,6 +53,7 @@ class Client {
       id: map['id'],
       name: map['name'],
       description: map['description'],
+      isSystem: map['is_system'] == 1,
       createdBy: map['created_by'],
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
@@ -63,6 +67,7 @@ class Client {
       id: json['id'],
       name: json['name'],
       description: json['description'],
+      isSystem: json['isSystem'] ?? false,
       createdBy: json['createdBy'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
@@ -76,6 +81,7 @@ class Client {
       'id': id,
       'name': name,
       'description': description,
+      'isSystem': isSystem,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -89,6 +95,7 @@ class Client {
       id: id,
       name: name ?? this.name,
       description: description ?? this.description,
+      isSystem: isSystem,
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: DateTime.now(),

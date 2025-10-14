@@ -53,9 +53,10 @@ class AppState extends ChangeNotifier {
   Future<List<Client>> getClients({bool? isActive}) async {
     try {
       final db = await _dbService.database;
+      // Filter out system clients (is_system = 0) from user-facing lists
       final List<Map<String, dynamic>> maps = await db.query(
         'clients',
-        where: isActive != null ? 'is_active = ?' : null,
+        where: isActive != null ? 'is_active = ? AND is_system = 0' : 'is_system = 0',
         whereArgs: isActive != null ? [isActive ? 1 : 0] : null,
         orderBy: 'name ASC',
       );
@@ -409,10 +410,10 @@ class AppState extends ChangeNotifier {
       final db = await _dbService.database;
       final searchPattern = '%$query%';
 
-      // Search clients
+      // Search clients (excluding system clients)
       final clients = await db.query(
         'clients',
-        where: 'name LIKE ? AND is_active = ?',
+        where: 'name LIKE ? AND is_active = ? AND is_system = 0',
         whereArgs: [searchPattern, 1],
         limit: 20,
       );

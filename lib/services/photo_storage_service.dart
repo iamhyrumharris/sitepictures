@@ -62,6 +62,38 @@ class PhotoStorageService {
     }
   }
 
+  /// Move temporary photo to permanent storage
+  /// Returns the new permanent file path
+  Future<String> moveToPermanent(TempPhoto tempPhoto, {required String permanentDir}) async {
+    try {
+      // Create permanent storage directory structure
+      final appDir = await getApplicationDocumentsDirectory();
+      final photoDir = Directory('${appDir.path}/photos/$permanentDir');
+
+      if (!await photoDir.exists()) {
+        await photoDir.create(recursive: true);
+      }
+
+      // Generate permanent file name using timestamp
+      final timestamp = tempPhoto.captureTimestamp;
+      final fileName = 'photo_${timestamp.millisecondsSinceEpoch}_${tempPhoto.id}.jpg';
+      final permanentPath = '${photoDir.path}/$fileName';
+
+      // Move file from temp to permanent location
+      final tempFile = File(tempPhoto.filePath);
+      if (await tempFile.exists()) {
+        await tempFile.copy(permanentPath);
+        await tempFile.delete(); // Clean up temp file
+      } else {
+        throw Exception('Temporary photo file not found: ${tempPhoto.filePath}');
+      }
+
+      return permanentPath;
+    } catch (e) {
+      throw Exception('Failed to move photo to permanent storage: ${e.toString()}');
+    }
+  }
+
   /// Generate thumbnail from image file
   /// Returns Uint8List of compressed thumbnail (100x100, 70% quality)
   Future<Uint8List?> _generateThumbnail(String filePath) async {
