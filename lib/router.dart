@@ -16,6 +16,7 @@ import 'screens/search/search_screen.dart';
 import 'screens/shell_scaffold.dart';
 import 'screens/equipment/folder_detail_screen.dart';
 import 'screens/needs_assigned_page.dart';
+import 'screens/photo_viewer_screen.dart';
 import 'services/auth_service.dart';
 import 'services/database_service.dart';
 import 'providers/auth_state.dart';
@@ -23,6 +24,7 @@ import 'providers/sync_state.dart';
 import 'providers/needs_assigned_provider.dart';
 import 'models/client.dart';
 import 'models/camera_context.dart';
+import 'models/photo.dart';
 
 class AppRouter {
   static final AuthService _authService = AuthService();
@@ -177,6 +179,22 @@ class AppRouter {
           return FolderDetailScreen(
             equipmentId: equipmentId,
             folderId: folderId,
+          );
+        },
+      ),
+
+      // Photo viewer route (full screen, no bottom nav)
+      GoRoute(
+        path: '/photo-viewer',
+        name: 'photoViewer',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final photos = extra?['photos'] as List<Photo>? ?? [];
+          final initialIndex = extra?['initialIndex'] as int? ?? 0;
+
+          return PhotoViewerScreen(
+            photos: photos,
+            initialIndex: initialIndex,
           );
         },
       ),

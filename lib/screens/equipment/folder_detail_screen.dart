@@ -261,9 +261,15 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
   }
 
   Widget _buildPhotoTile(Photo photo) {
+    final photoIndex = widget.photos.indexOf(photo);
+
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to photo detail/carousel view
+        // Navigate to photo viewer with photos from current tab
+        context.push('/photo-viewer', extra: {
+          'photos': widget.photos,
+          'initialIndex': photoIndex,
+        });
       },
       onLongPress: () {
         _showPhotoContextMenu(photo);

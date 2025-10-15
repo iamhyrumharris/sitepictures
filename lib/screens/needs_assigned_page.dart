@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 import '../services/database_service.dart';
 import '../widgets/needs_assigned_badge.dart';
@@ -285,18 +286,18 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
 
   Widget _buildPhotoTile(Photo photo) {
     final isSelected = _selectedPhotoIds.contains(photo.id);
+    final photoIndex = _standalonePhotos.indexOf(photo);
 
     return GestureDetector(
       onTap: () {
         if (_isSelectionMode) {
           _togglePhotoSelection(photo.id);
         } else {
-          // TODO: Navigate to photo detail page
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo detail view coming soon'),
-            ),
-          );
+          // Navigate to photo viewer with standalone photos
+          context.push('/photo-viewer', extra: {
+            'photos': _standalonePhotos,
+            'initialIndex': photoIndex,
+          });
         }
       },
       onLongPress: () {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/photo.dart';
 import '../../providers/app_state.dart';
 import '../../widgets/folder_badge.dart';
@@ -163,9 +164,15 @@ class _AllPhotosTabState extends State<AllPhotosTab>
   }
 
   Widget _buildPhotoTile(Photo photo) {
+    final photoIndex = _photos.indexOf(photo);
+
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to photo detail/carousel view
+        // Navigate to photo viewer with all photos
+        context.push('/photo-viewer', extra: {
+          'photos': _photos,
+          'initialIndex': photoIndex,
+        });
       },
       onLongPress: () {
         _showPhotoContextMenu(photo);
