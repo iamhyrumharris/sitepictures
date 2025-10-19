@@ -157,6 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBody() {
+    final authState = context.watch<AuthState>();
+
     if (_isLoading) {
       return const LoadingIndicator(message: 'Loading...');
     }
@@ -203,7 +205,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
 
                 // Clients section
-                _buildSectionHeader('Clients'),
+                _buildSectionHeader(
+                  'Clients',
+                  trailing: authState.hasPermission('create')
+                      ? _buildAddClientButton()
+                      : null,
+                ),
                 if (_clients == null || _clients!.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(32),
@@ -241,13 +248,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, {Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
       ),
+    );
+  }
+
+  Widget _buildAddClientButton() {
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      onPressed: _showAddClientDialog,
+      icon: const Icon(Icons.add, color: Colors.black87),
+      tooltip: 'Add Client',
     );
   }
 

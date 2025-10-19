@@ -18,11 +18,7 @@ import 'screens/equipment/folder_detail_screen.dart';
 import 'screens/needs_assigned_page.dart';
 import 'screens/photo_viewer_screen.dart';
 import 'services/auth_service.dart';
-import 'services/database_service.dart';
-import 'providers/auth_state.dart';
-import 'providers/sync_state.dart';
 import 'providers/needs_assigned_provider.dart';
-import 'models/client.dart';
 import 'models/camera_context.dart';
 import 'models/photo.dart';
 
@@ -66,7 +62,7 @@ class AppRouter {
           }
 
           // Home screen uses default camera FAB for now
-          // (Add Client moved to AppBar or will be handled differently)
+          // Add Client action is rendered inside the Clients section header
           return ShellScaffold(currentIndex: currentIndex, child: child);
         },
         routes: [
@@ -192,10 +188,7 @@ class AppRouter {
           final photos = extra?['photos'] as List<Photo>? ?? [];
           final initialIndex = extra?['initialIndex'] as int? ?? 0;
 
-          return PhotoViewerScreen(
-            photos: photos,
-            initialIndex: initialIndex,
-          );
+          return PhotoViewerScreen(photos: photos, initialIndex: initialIndex);
         },
       ),
 
@@ -237,9 +230,7 @@ class AppRouter {
 
           return ChangeNotifierProvider(
             create: (_) => PhotoCaptureProvider(),
-            child: CameraCapturePage(
-              cameraContext: cameraContext,
-            ),
+            child: CameraCapturePage(cameraContext: cameraContext),
           );
         },
       ),
@@ -279,17 +270,14 @@ class _HomeScreenContent extends StatefulWidget {
 }
 
 class _HomeScreenContentState extends State<_HomeScreenContent> {
-  final DatabaseService _dbService = DatabaseService();
-
   @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthState>();
-    final syncState = context.watch<SyncState>();
     final needsAssignedProvider = context.watch<NeedsAssignedProvider>();
 
     // Calculate total items needing assignment
-    final needsAssignedCount = needsAssignedProvider.globalPhotos.length +
-                                needsAssignedProvider.globalFolders.length;
+    final needsAssignedCount =
+        needsAssignedProvider.globalPhotos.length +
+        needsAssignedProvider.globalFolders.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -306,158 +294,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
               tooltip: 'Needs Assigned',
             ),
           ),
-          // Add Client button (moved from FAB to avoid conflict with camera FAB)
-          if (authState.hasPermission('create'))
-            IconButton(
-              icon: const Icon(Icons.person_add),
-              onPressed: () => _showAddClientDialog(context),
-              tooltip: 'Add Client',
-            ),
           // Search button
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => context.push('/search'),
             tooltip: 'Search',
           ),
-          // Sync status
-          if (syncState.pendingCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Center(
-                child: Badge(
-                  label: Text('${syncState.pendingCount}'),
-                  child: IconButton(
-                    icon: const Icon(Icons.cloud_upload),
-                    onPressed: () => syncState.syncAll(),
-                  ),
-                ),
-              ),
-            ),
-          // User menu
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle),
-            itemBuilder: (context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                enabled: false,
-                child: Text(authState.currentUser?.name ?? 'User'),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem<String>(
-                value: 'settings',
-                child: Text('Settings'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'logout',
-                child: Text('Logout'),
-              ),
-            ],
-            onSelected: (value) async {
-              if (value == 'settings') {
-                context.push('/settings');
-              } else if (value == 'logout') {
-                await authState.logout();
-                if (context.mounted) {
-                  context.go('/login');
-                }
-              }
-            },
-          ),
         ],
       ),
       body: const HomeScreen(),
-    );
-  }
-
-  void _showAddClientDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Client'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Client Name',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a client name')),
-                );
-                return;
-              }
-
-              final navigator = Navigator.of(context);
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              final authState = context.read<AuthState>();
-
-              try {
-                final userId = authState.currentUser?.id ?? 'system';
-                final client = Client(
-                  name: name,
-                  description: descriptionController.text.trim().isEmpty
-                      ? null
-                      : descriptionController.text.trim(),
-                  createdBy: userId,
-                );
-
-                final db = await _dbService.database;
-                await db.insert('clients', client.toMap());
-
-                navigator.pop();
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Client created successfully'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-
-                // Force rebuild to show new client
-                if (mounted) {
-                  setState(() {});
-                }
-              } catch (e) {
-                navigator.pop();
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to create client: $e'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
     );
   }
 }

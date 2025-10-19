@@ -11,6 +11,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
   final TextEditingController _controller = TextEditingController();
   final int _maxLength = 50;
   bool _isValid = false;
+  bool _hasInvalidCharacters = false;
 
   @override
   void initState() {
@@ -26,8 +27,12 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
   }
 
   void _validateInput() {
+    final trimmed = _controller.text.trim();
+    final sanitized = _sanitizeInput(trimmed);
+
     setState(() {
-      _isValid = _controller.text.trim().isNotEmpty;
+      _isValid = sanitized.isNotEmpty;
+      _hasInvalidCharacters = trimmed.isNotEmpty && sanitized.isEmpty;
     });
   }
 
@@ -37,10 +42,18 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
   }
 
   void _handleCreate() {
-    if (_isValid) {
-      final sanitized = _sanitizeInput(_controller.text.trim());
-      Navigator.of(context).pop(sanitized);
+    final trimmed = _controller.text.trim();
+    final sanitized = _sanitizeInput(trimmed);
+
+    if (sanitized.isEmpty) {
+      setState(() {
+        _isValid = false;
+        _hasInvalidCharacters = trimmed.isNotEmpty;
+      });
+      return;
     }
+
+    Navigator.of(context).pop(sanitized);
   }
 
   @override
@@ -64,6 +77,9 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
               hintText: 'e.g., WO-789',
               border: const OutlineInputBorder(),
               counterText: '${_controller.text.length}/$_maxLength',
+              errorText: _hasInvalidCharacters
+                  ? 'Use letters, numbers, spaces, -, _, #, or /.'
+                  : null,
             ),
             onSubmitted: (_) => _handleCreate(),
           ),

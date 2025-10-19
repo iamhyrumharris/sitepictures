@@ -13,7 +13,7 @@ import '../../widgets/breadcrumb_navigation.dart';
 import '../../widgets/expandable_fab.dart';
 import '../../widgets/bottom_nav.dart';
 
-/// SubSite screen showing nested subsites and equipment
+/// SubSite screen showing equipment
 /// Implements FR-006
 class SubSiteScreen extends StatefulWidget {
   final String clientId;
@@ -35,7 +35,6 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
   Client? _client;
   MainSite? _mainSite;
   SubSite? _subSite;
-  List<SubSite> _nestedSubSites = [];
   List<Equipment> _equipment = [];
   bool _isLoading = true;
   String? _error;
@@ -57,14 +56,12 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
       final client = await appState.getClient(widget.clientId);
       final mainSite = await appState.getMainSite(widget.mainSiteId);
       final subSite = await appState.getSubSite(widget.subSiteId);
-      final nestedSubSites = await appState.getNestedSubSites(widget.subSiteId);
       final equipment = await appState.getEquipmentForSubSite(widget.subSiteId);
 
       setState(() {
         _client = client;
         _mainSite = mainSite;
         _subSite = subSite;
-        _nestedSubSites = nestedSubSites;
         _equipment = equipment;
         _isLoading = false;
       });
@@ -142,7 +139,7 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
       );
     }
 
-    if (_nestedSubSites.isEmpty && _equipment.isEmpty) {
+    if (_equipment.isEmpty) {
       return _buildEmptyState();
     }
 
@@ -150,19 +147,6 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
       onRefresh: _loadData,
       child: ListView(
         children: [
-          if (_nestedSubSites.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'SubSites',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            ..._nestedSubSites.map((subSite) => _buildSubSiteTile(subSite)),
-          ],
           if (_equipment.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -195,14 +179,14 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'No SubSites or Equipment Yet',
+              'No Equipment Yet',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
-              'Add subsites or equipment to organize this subsite',
+              'Add equipment to organize this subsite',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
@@ -211,21 +195,6 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSubSiteTile(SubSite subSite) {
-    return ListTile(
-      leading: const Icon(Icons.folder, size: 40, color: Colors.orange),
-      title: Text(subSite.name),
-      subtitle: subSite.description != null ? Text(subSite.description!) : null,
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {
-        // Navigate to nested subsite
-        context.push(
-          '/subsite/${subSite.id}?clientId=${widget.clientId}&mainSiteId=${widget.mainSiteId}',
-        );
-      },
     );
   }
 
@@ -264,15 +233,9 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
     );
   }
 
-  /// Get FAB menu items (2 items for subsite page)
+  /// Get FAB menu items (equipment only on subsite page)
   List<FABMenuItem> _getFABMenuItems() {
     return [
-      FABMenuItem(
-        label: 'Add SubSite',
-        icon: Icons.folder,
-        onTap: _showAddSubSiteDialog,
-        backgroundColor: Colors.orange,
-      ),
       FABMenuItem(
         label: 'Add Equipment',
         icon: Icons.precision_manufacturing,
@@ -280,79 +243,6 @@ class _SubSiteScreenState extends State<SubSiteScreen> {
         backgroundColor: Colors.purple,
       ),
     ];
-  }
-
-  /// Show nested subsite creation dialog
-  void _showAddSubSiteDialog() {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add SubSite'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'SubSite Name',
-                hintText: 'Enter subsite name',
-              ),
-              maxLength: 100,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                hintText: 'Enter description',
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a subsite name')),
-                );
-                return;
-              }
-
-              try {
-                final appState = context.read<AppState>();
-                await appState.createSubSite(
-                  nameController.text.trim(),
-                  descriptionController.text.trim().isEmpty
-                      ? null
-                      : descriptionController.text.trim(),
-                  parentSubSiteId: widget.subSiteId,
-                );
-
-                Navigator.pop(context);
-                await _loadData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('SubSite created successfully')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Show equipment creation dialog with subsite context preserved

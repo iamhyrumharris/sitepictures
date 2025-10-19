@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -183,6 +183,34 @@ class DatabaseService {
       )
     ''');
 
+    // Photo folders table
+    await db.execute('''
+      CREATE TABLE photo_folders (
+        id TEXT PRIMARY KEY,
+        equipment_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        work_order TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    ''');
+
+    // Folder photos junction table
+    await db.execute('''
+      CREATE TABLE folder_photos (
+        folder_id TEXT NOT NULL,
+        photo_id TEXT NOT NULL,
+        before_after TEXT NOT NULL CHECK(before_after IN ('before', 'after')),
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (folder_id, photo_id),
+        FOREIGN KEY (folder_id) REFERENCES photo_folders(id) ON DELETE CASCADE,
+        FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Create indexes for performance optimization
     await _createIndexes(db);
   }
@@ -215,6 +243,21 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX idx_photo_sync ON photos(is_synced, created_at)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photo_folders_equipment ON photo_folders(equipment_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photo_folders_created_at ON photo_folders(created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photo_folders_equipment_created ON photo_folders(equipment_id, created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_folder_photos_folder ON folder_photos(folder_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_folder_photos_photo ON folder_photos(photo_id)',
     );
 
     // Recent locations indexes
@@ -251,6 +294,10 @@ class DatabaseService {
     // Migration 004: Global "Needs Assigned" support
     if (oldVersion < 4) {
       await _migration004(db);
+    }
+    // Migration 005: Ensure photo folders tables exist for installations created before migration 002
+    if (oldVersion < 5) {
+      await _migration005(db);
     }
   }
 
@@ -442,6 +489,51 @@ class DatabaseService {
     // Create index for filtering out system clients from user lists
     await db.execute(
       'CREATE INDEX idx_clients_system ON clients(is_system, is_active)',
+    );
+  }
+
+  Future<void> _migration005(Database db) async {
+    // Migration 005: Backfill photo folders tables for older installations
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS photo_folders (
+        id TEXT PRIMARY KEY,
+        equipment_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        work_order TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS folder_photos (
+        folder_id TEXT NOT NULL,
+        photo_id TEXT NOT NULL,
+        before_after TEXT NOT NULL CHECK(before_after IN ('before', 'after')),
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (folder_id, photo_id),
+        FOREIGN KEY (folder_id) REFERENCES photo_folders(id) ON DELETE CASCADE,
+        FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photo_folders_equipment ON photo_folders(equipment_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photo_folders_created_at ON photo_folders(created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photo_folders_equipment_created ON photo_folders(equipment_id, created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_folder_photos_folder ON folder_photos(folder_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_folder_photos_photo ON folder_photos(photo_id)',
     );
   }
 
