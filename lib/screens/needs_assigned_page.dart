@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:io';
 import '../services/database_service.dart';
+import '../services/photo_storage_service.dart';
 import '../widgets/needs_assigned_badge.dart';
 import '../models/photo.dart';
 
@@ -377,30 +377,35 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
   Widget _buildPhotoImage(Photo photo) {
     // Try to load thumbnail first, fall back to full image
     final imagePath = photo.thumbnailPath ?? photo.filePath;
-    final imageFile = File(imagePath);
+    final localFile = PhotoStorageService.tryResolveLocalFile(imagePath);
+    final remoteUrl = photo.remoteUrl;
 
-    return FutureBuilder<bool>(
-      future: imageFile.exists(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        }
+    if (localFile != null) {
+      return FutureBuilder<bool>(
+        future: localFile.exists(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          }
 
-        if (snapshot.hasData && snapshot.data == true) {
-          return Image.file(
-            imageFile,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return _buildPlaceholder();
-            },
-          );
-        }
+          if (snapshot.hasData && snapshot.data == true) {
+            return Image.file(
+              localFile,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _buildPlaceholder();
+              },
+            );
+          }
 
-        return _buildPlaceholder();
-      },
-    );
+          return _buildRemoteOrPlaceholder(remoteUrl);
+        },
+      );
+    }
+
+    return _buildRemoteOrPlaceholder(remoteUrl);
   }
 
   Widget _buildPlaceholder() {
@@ -410,6 +415,17 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
         child: Icon(Icons.image, size: 40, color: Colors.grey),
       ),
     );
+  }
+
+  Widget _buildRemoteOrPlaceholder(String? remoteUrl) {
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      return Image.network(
+        remoteUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, _, __) => _buildPlaceholder(),
+      );
+    }
+    return _buildPlaceholder();
   }
 
 
@@ -499,14 +515,15 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
 
         // Delete files
         try {
-          final photoFile = File(photo.filePath);
-          if (await photoFile.exists()) {
+          final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+          if (photoFile != null && await photoFile.exists()) {
             await photoFile.delete();
           }
 
           if (photo.thumbnailPath != null) {
-            final thumbnailFile = File(photo.thumbnailPath!);
-            if (await thumbnailFile.exists()) {
+            final thumbnailFile =
+                PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
+            if (thumbnailFile != null && await thumbnailFile.exists()) {
               await thumbnailFile.delete();
             }
           }

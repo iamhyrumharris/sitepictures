@@ -1,0 +1,13 @@
+node_modules/
+coverage/
+docs/
+tests/
+.env
+.env.*
+!**/.env.example
+.eslintignore
+.eslintrc*
+.prettierignore
+.prettierrc*
+Dockerfile
+scripts/

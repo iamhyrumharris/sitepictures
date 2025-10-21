@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -280,6 +280,9 @@ class DatabaseService {
     await db.execute(
       'CREATE INDEX idx_clients_system ON clients(is_system, is_active)',
     );
+
+    // All Photos gallery index
+    await _migration006(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -298,6 +301,10 @@ class DatabaseService {
     // Migration 005: Ensure photo folders tables exist for installations created before migration 002
     if (oldVersion < 5) {
       await _migration005(db);
+    }
+    // Migration 006: Descending timestamp index for global gallery
+    if (oldVersion < 6) {
+      await _migration006(db);
     }
   }
 
@@ -472,7 +479,9 @@ class DatabaseService {
     // Changes: Add is_system column to clients table for special system clients
 
     // Add system flag to clients table
-    await db.execute('ALTER TABLE clients ADD COLUMN is_system INTEGER DEFAULT 0');
+    await db.execute(
+      'ALTER TABLE clients ADD COLUMN is_system INTEGER DEFAULT 0',
+    );
 
     // Create global "Needs Assigned" client
     await db.insert('clients', {
@@ -534,6 +543,15 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_folder_photos_photo ON folder_photos(photo_id)',
+    );
+  }
+
+  Future<void> _migration006(Database db) async {
+    // Migration 006: Timestamp index for global All Photos gallery
+    // Feature: 007-i-want-to
+    // Date: 2025-10-19
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photos_timestamp ON photos(timestamp DESC)',
     );
   }
 
@@ -657,5 +675,60 @@ class DatabaseService {
     ''',
       [equipmentId],
     );
+  }
+
+  /// Get all photos across equipment with metadata for All Photos gallery
+  Future<List<Map<String, dynamic>>> getAllPhotos({
+    int limit = 50,
+    int offset = 0,
+    DateTime? before,
+  }) async {
+    final db = await database;
+    final beforeClause = before != null
+        ? 'AND datetime(p.timestamp) < datetime(?)'
+        : '';
+    final args = <Object?>[];
+    if (before != null) {
+      args.add(before.toIso8601String());
+    }
+    args
+      ..add(limit)
+      ..add(offset);
+
+    final query =
+        '''
+      SELECT
+        p.*,
+        e.name AS equipment_name,
+        c.name AS client_name,
+        ms.name AS main_site_name,
+        ss.name AS sub_site_name,
+        COALESCE(
+          NULLIF(TRIM(
+            COALESCE(ss.name || ' • ', '') ||
+            COALESCE(ms.name || ' • ', '') ||
+            COALESCE(c.name, '')
+          ), ''),
+          e.name
+        ) AS location_summary
+      FROM photos p
+      JOIN equipment e ON e.id = p.equipment_id
+      LEFT JOIN main_sites ms ON ms.id = e.main_site_id
+      LEFT JOIN sub_sites ss ON ss.id = e.sub_site_id
+      LEFT JOIN clients c ON c.id = COALESCE(
+        ss.client_id,
+        ms.client_id,
+        e.client_id
+      )
+      WHERE e.is_active = 1
+        AND (ms.id IS NULL OR ms.is_active = 1)
+        AND (ss.id IS NULL OR ss.is_active = 1)
+        AND (c.id IS NULL OR c.is_active = 1)
+        $beforeClause
+      ORDER BY datetime(p.timestamp) DESC, datetime(p.created_at) DESC
+      LIMIT ? OFFSET ?
+    ''';
+
+    return await db.rawQuery(query, args);
   }
 }

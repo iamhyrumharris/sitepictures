@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/photo_capture_provider.dart';
 import '../providers/equipment_navigator_provider.dart';
+import '../providers/all_photos_provider.dart';
 import '../widgets/camera_preview_overlay.dart';
 import '../widgets/photo_thumbnail_strip.dart';
 import '../widgets/capture_button.dart';
@@ -183,6 +184,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     final photoSaveService = PhotoSaveService(
       databaseService: DatabaseService(),
       storageService: PhotoStorageService(),
+      allPhotosProvider: context.read<AllPhotosProvider>(),
     );
 
     // Show loading dialog with progress indicator
@@ -286,16 +288,15 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          color: Colors.white,
-        ),
-      ),
+      builder: (context) =>
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
     );
 
     try {
       // Execute Quick Save
-      final result = await quickSaveService.quickSave(_provider!.session.photos);
+      final result = await quickSaveService.quickSave(
+        _provider!.session.photos,
+      );
 
       // Close loading dialog
       if (mounted) Navigator.of(context).pop();
@@ -403,6 +404,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     final photoSaveService = PhotoSaveService(
       databaseService: DatabaseService(),
       storageService: PhotoStorageService(),
+      allPhotosProvider: context.read<AllPhotosProvider>(),
     );
 
     // Show loading dialog with progress indicator (FR-057)
@@ -554,7 +556,8 @@ class _CameraCapturePageState extends State<CameraCapturePage>
         ),
       );
 
-      if (shouldSaveToEquipment == true && widget.cameraContext.equipmentId != null) {
+      if (shouldSaveToEquipment == true &&
+          widget.cameraContext.equipmentId != null) {
         // Fallback: save to equipment's All Photos
         return _handleEquipmentSave(context);
       }
@@ -568,6 +571,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     final photoSaveService = PhotoSaveService(
       databaseService: DatabaseService(),
       storageService: PhotoStorageService(),
+      allPhotosProvider: context.read<AllPhotosProvider>(),
     );
 
     // Show loading dialog with progress indicator (FR-057)
@@ -597,7 +601,9 @@ class _CameraCapturePageState extends State<CameraCapturePage>
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${result.successfulCount} ${result.successfulCount == 1 ? 'photo' : 'photos'} saved to $categoryStr'),
+            content: Text(
+              '${result.successfulCount} ${result.successfulCount == 1 ? 'photo' : 'photos'} saved to $categoryStr',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -609,7 +615,9 @@ class _CameraCapturePageState extends State<CameraCapturePage>
         // Partial save (FR-055b)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${result.successfulCount} of ${result.successfulCount + result.failedCount} photos saved to $categoryStr'),
+            content: Text(
+              '${result.successfulCount} of ${result.successfulCount + result.failedCount} photos saved to $categoryStr',
+            ),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 4),
           ),

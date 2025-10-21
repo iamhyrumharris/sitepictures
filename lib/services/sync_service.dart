@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
 import '../models/sync_queue_item.dart';
 import 'database_service.dart';
 import 'api_service.dart';
+import 'photo_storage_service.dart';
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
@@ -142,13 +142,13 @@ class SyncService {
     Map<String, dynamic> payload,
   ) async {
     if (item.operation == 'create') {
-      final filePath = payload['filePath'] as String;
-      final file = File(filePath);
+      final storedPath = payload['filePath'] as String;
+      final file = PhotoStorageService.tryResolveLocalFile(storedPath);
 
-      if (await file.exists()) {
+      if (file != null && await file.exists()) {
         final response = await _apiService.uploadFile(
           '/equipment/${payload['equipmentId']}/photos',
-          filePath,
+          file.path,
           {
             'latitude': payload['latitude'].toString(),
             'longitude': payload['longitude'].toString(),

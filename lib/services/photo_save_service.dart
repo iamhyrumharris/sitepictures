@@ -6,6 +6,7 @@ import '../models/save_result.dart';
 import '../models/equipment.dart';
 import '../models/photo_folder.dart';
 import '../models/folder_photo.dart';
+import '../providers/all_photos_provider.dart';
 import '../services/database_service.dart';
 import '../services/photo_storage_service.dart';
 
@@ -30,12 +31,15 @@ class PhotoSaveService {
   final PhotoStorageService _storage;
   final StreamController<SaveProgress> _progressController =
       StreamController<SaveProgress>.broadcast();
+  final AllPhotosProvider? _allPhotosProvider;
 
   PhotoSaveService({
     required DatabaseService databaseService,
     required PhotoStorageService storageService,
-  })  : _db = databaseService,
-        _storage = storageService;
+    AllPhotosProvider? allPhotosProvider,
+  }) : _db = databaseService,
+       _storage = storageService,
+       _allPhotosProvider = allPhotosProvider;
 
   /// Stream of save progress events during incremental save
   Stream<SaveProgress> get progressStream => _progressController.stream;
@@ -47,7 +51,9 @@ class PhotoSaveService {
   }) async {
     final startTime = DateTime.now();
     print('PhotoSave: Starting saveToEquipment for ${photos.length} photo(s)');
-    print('PhotoSave: Target equipment: ${equipment.name} (ID: ${equipment.id})');
+    print(
+      'PhotoSave: Target equipment: ${equipment.name} (ID: ${equipment.id})',
+    );
 
     if (photos.isEmpty) {
       print('PhotoSave: ERROR - No photos to save');
@@ -94,13 +100,17 @@ class PhotoSaveService {
         final tempPhoto = photos[i];
 
         // Emit progress event
-        _progressController.add(SaveProgress(
-          current: i + 1,
-          total: photos.length,
-          currentPhotoId: tempPhoto.id,
-        ));
+        _progressController.add(
+          SaveProgress(
+            current: i + 1,
+            total: photos.length,
+            currentPhotoId: tempPhoto.id,
+          ),
+        );
 
-        print('PhotoSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id})');
+        print(
+          'PhotoSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id})',
+        );
 
         try {
           await _savePhotoToEquipment(
@@ -119,19 +129,27 @@ class PhotoSaveService {
       // Calculate elapsed time
       final elapsed = DateTime.now().difference(startTime);
       print('PhotoSave: Operation completed in ${elapsed.inMilliseconds}ms');
-      print('PhotoSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed');
+      print(
+        'PhotoSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed',
+      );
 
       // Return result based on outcome
       if (failedIds.isEmpty) {
-        print('PhotoSave: SUCCESS - All photos saved to equipment "${equipment.name}"');
-        return SaveResult.complete(savedIds);
+        print(
+          'PhotoSave: SUCCESS - All photos saved to equipment "${equipment.name}"',
+        );
+        final result = SaveResult.complete(savedIds);
+        _notifyAllPhotosProvider(savedIds);
+        return result;
       } else {
         print('PhotoSave: PARTIAL - Some photos failed to save');
-        return SaveResult.partial(
+        final result = SaveResult.partial(
           successful: savedIds.length,
           failed: failedIds.length,
           savedIds: savedIds,
         );
+        _notifyAllPhotosProvider(savedIds);
+        return result;
       }
     } catch (e) {
       // Critical error: preserve session
@@ -201,13 +219,17 @@ class PhotoSaveService {
         final tempPhoto = photos[i];
 
         // Emit progress event
-        _progressController.add(SaveProgress(
-          current: i + 1,
-          total: photos.length,
-          currentPhotoId: tempPhoto.id,
-        ));
+        _progressController.add(
+          SaveProgress(
+            current: i + 1,
+            total: photos.length,
+            currentPhotoId: tempPhoto.id,
+          ),
+        );
 
-        print('PhotoSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id}) to $categoryStr');
+        print(
+          'PhotoSave: Saving photo ${i + 1}/${photos.length} (ID: ${tempPhoto.id}) to $categoryStr',
+        );
 
         try {
           await _savePhotoToFolder(
@@ -228,19 +250,27 @@ class PhotoSaveService {
       // Calculate elapsed time
       final elapsed = DateTime.now().difference(startTime);
       print('PhotoSave: Operation completed in ${elapsed.inMilliseconds}ms');
-      print('PhotoSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed');
+      print(
+        'PhotoSave: Results - ${savedIds.length} succeeded, ${failedIds.length} failed',
+      );
 
       // Return result based on outcome
       if (failedIds.isEmpty) {
-        print('PhotoSave: SUCCESS - All photos saved to folder "${folder.name}" ($categoryStr)');
-        return SaveResult.complete(savedIds);
+        print(
+          'PhotoSave: SUCCESS - All photos saved to folder "${folder.name}" ($categoryStr)',
+        );
+        final result = SaveResult.complete(savedIds);
+        _notifyAllPhotosProvider(savedIds);
+        return result;
       } else {
         print('PhotoSave: PARTIAL - Some photos failed to save');
-        return SaveResult.partial(
+        final result = SaveResult.partial(
           successful: savedIds.length,
           failed: failedIds.length,
           savedIds: savedIds,
         );
+        _notifyAllPhotosProvider(savedIds);
+        return result;
       }
     } catch (e) {
       // Critical error: preserve session
@@ -364,20 +394,21 @@ class PhotoSaveService {
     final db = await _db.database;
 
     // Move photo to permanent storage
-    final permanentPath = await _storage.moveToPermanent(
+    final storedPath = await _storage.moveToPermanent(
       tempPhoto,
       permanentDir: equipmentId,
     );
 
     // Get file size
-    final file = File(permanentPath);
+    final absolutePath = PhotoStorageService.resolveAbsolutePath(storedPath);
+    final file = File(absolutePath);
     final fileSize = await file.length();
 
     // Insert photo into database
     await db.insert('photos', {
       'id': tempPhoto.id,
       'equipment_id': equipmentId,
-      'file_path': permanentPath,
+      'file_path': storedPath,
       'thumbnail_path': null, // Generate asynchronously later
       'latitude': 0.0, // TODO: Get from location service
       'longitude': 0.0, // TODO: Get from location service
@@ -401,13 +432,14 @@ class PhotoSaveService {
     final db = await _db.database;
 
     // Move photo to permanent storage
-    final permanentPath = await _storage.moveToPermanent(
+    final storedPath = await _storage.moveToPermanent(
       tempPhoto,
       permanentDir: equipmentId,
     );
 
     // Get file size
-    final file = File(permanentPath);
+    final absolutePath = PhotoStorageService.resolveAbsolutePath(storedPath);
+    final file = File(absolutePath);
     final fileSize = await file.length();
 
     // Use transaction to ensure atomicity
@@ -416,7 +448,7 @@ class PhotoSaveService {
       await txn.insert('photos', {
         'id': tempPhoto.id,
         'equipment_id': equipmentId,
-        'file_path': permanentPath,
+        'file_path': storedPath,
         'thumbnail_path': null, // Generate asynchronously later
         'latitude': 0.0, // TODO: Get from location service
         'longitude': 0.0, // TODO: Get from location service
@@ -437,6 +469,16 @@ class PhotoSaveService {
         'added_at': DateTime.now().toIso8601String(),
       });
     });
+  }
+
+  void _notifyAllPhotosProvider(List<String> savedIds) {
+    if (_allPhotosProvider == null) {
+      return;
+    }
+    if (savedIds.isEmpty) {
+      return;
+    }
+    _allPhotosProvider!.invalidate();
   }
 
   /// Dispose of resources

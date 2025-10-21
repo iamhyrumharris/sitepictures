@@ -21,6 +21,7 @@ class BreadcrumbNavigation extends StatelessWidget {
       height: 40,
       color: Colors.grey[100],
       child: ListView.builder(
+        key: const Key('breadcrumb-scroll'),
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: breadcrumbs.length,

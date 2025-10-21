@@ -241,13 +241,14 @@ class QuickSaveService {
     final db = await _db.database;
 
     // Move photo to permanent storage
-    final permanentPath = await _storage.moveToPermanent(
+    final storedPath = await _storage.moveToPermanent(
       tempPhoto,
       permanentDir: equipmentId,
     );
 
     // Get file size
-    final file = File(permanentPath);
+    final absolutePath = PhotoStorageService.resolveAbsolutePath(storedPath);
+    final file = File(absolutePath);
     final fileSize = await file.length();
 
     // Insert photo into database
@@ -255,7 +256,7 @@ class QuickSaveService {
       await txn.insert('photos', {
         'id': tempPhoto.id,
         'equipment_id': equipmentId,
-        'file_path': permanentPath,
+        'file_path': storedPath,
         'thumbnail_path': null, // Generate asynchronously later
         'latitude': 0.0, // TODO: Get from location service
         'longitude': 0.0, // TODO: Get from location service

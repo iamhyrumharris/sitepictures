@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../services/photo_storage_service.dart';
 
 /// Carousel view for browsing captured photos
 /// Implements FR-008, FR-009
@@ -73,29 +73,39 @@ class _PhotoCarouselViewState extends State<PhotoCarouselView> {
   }
 
   Widget _buildPhotoPage(String photoPath) {
+    final localFile = PhotoStorageService.tryResolveLocalFile(photoPath);
+
     return InteractiveViewer(
       minScale: 0.5,
       maxScale: 4.0,
       child: Center(
-        child: Image.file(
-          File(photoPath),
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error, size: 64, color: Colors.red),
-                  SizedBox(height: 16),
-                  Text(
-                    'Failed to load image',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
+        child: localFile != null
+            ? Image.file(
+                localFile,
+                fit: BoxFit.contain,
+                errorBuilder: _errorBuilder,
+              )
+            : Image.network(
+                photoPath,
+                fit: BoxFit.contain,
+                errorBuilder: _errorBuilder,
               ),
-            );
-          },
-        ),
+      ),
+    );
+  }
+
+  Widget _errorBuilder(BuildContext context, Object error, StackTrace? stackTrace) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error, size: 64, color: Colors.red),
+          SizedBox(height: 16),
+          Text(
+            'Failed to load image',
+            style: TextStyle(color: Colors.white),
+          ),
+        ],
       ),
     );
   }
