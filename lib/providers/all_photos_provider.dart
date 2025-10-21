@@ -56,7 +56,7 @@ class AllPhotosProvider extends ChangeNotifier {
     }
 
     if (_ongoingInitialLoad != null) {
-      return _ongoingInitialLoad;
+      return _ongoingInitialLoad!;
     }
 
     final future = _performInitialLoad();
@@ -107,7 +107,7 @@ class AllPhotosProvider extends ChangeNotifier {
       return;
     }
     if (_ongoingPagination != null) {
-      return _ongoingPagination;
+      return _ongoingPagination!;
     }
 
     final future = _performPagination();
