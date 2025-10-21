@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:workmanager/workmanager.dart';
 import 'sync_service.dart';
+import 'photo_storage_service.dart';
 
 /// Background sync service using WorkManager for Android and BGTaskScheduler for iOS
 /// Implements T056 - Background sync requirements
@@ -41,6 +42,11 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
       if (task == BackgroundSyncService.syncTaskName) {
+        // Initialize photo storage service before sync operations
+        // This is required because background sync runs in a headless isolate
+        // that doesn't have PhotoStorageService initialized
+        await PhotoStorageService.ensureInitialized();
+        
         // Perform sync operation
         final syncService = SyncService();
         await syncService.syncAll();
