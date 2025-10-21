@@ -60,7 +60,9 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'page[offset] must be a non-negative integer' });
     }
 
-    const countResult = await db.query('SELECT COUNT(*)::int AS total FROM photos');
+    const countResult = await db.query(
+      'SELECT COUNT(*)::int AS total FROM photos WHERE is_deleted = FALSE',
+    );
     const total = countResult.rows?.[0]?.total ?? 0;
 
     const photoResult = await db.query(
@@ -80,6 +82,7 @@ router.get('/', async (req, res) => {
       JOIN sites s ON s.id = e.site_id
       LEFT JOIN sites parent ON parent.id = s.parent_site_id
       JOIN clients c ON c.id = s.client_id
+      WHERE p.is_deleted = FALSE
       ORDER BY p.captured_at DESC, p.created_at DESC
       LIMIT $1 OFFSET $2`,
       [limit, offset],

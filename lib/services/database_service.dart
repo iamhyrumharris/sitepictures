@@ -721,6 +721,7 @@ class DatabaseService {
         e.client_id
       )
       WHERE e.is_active = 1
+        AND p.is_deleted = 0
         AND (ms.id IS NULL OR ms.is_active = 1)
         AND (ss.id IS NULL OR ss.is_active = 1)
         AND (c.id IS NULL OR c.is_active = 1)
