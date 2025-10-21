@@ -18,7 +18,12 @@ class BottomNav extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(context, Icons.home, 'Home', 0),
-            _buildNavItem(context, Icons.map, 'Map', 1),
+            _buildNavItem(
+              context,
+              Icons.photo_library_outlined,
+              'All Photos',
+              1,
+            ),
             _buildNavItem(context, Icons.settings, 'Settings', 2),
           ],
         ),
@@ -63,7 +68,7 @@ class BottomNav extends StatelessWidget {
         context.go('/home');
         break;
       case 1:
-        context.go('/map');
+        context.go('/all-photos');
         break;
       case 2:
         context.go('/settings');

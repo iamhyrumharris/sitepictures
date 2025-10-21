@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 import '../models/photo.dart';
 import 'gps_service.dart';
 import 'database_service.dart';
+import 'photo_storage_service.dart';
 
 class CameraService {
   static final CameraService _instance = CameraService._internal();
@@ -68,6 +69,9 @@ class CameraService {
     final fileName =
         '${timestamp.millisecondsSinceEpoch}_${equipmentId.substring(0, 8)}.jpg';
 
+    // Ensure photo storage base path is initialized
+    await PhotoStorageService.ensureInitialized();
+
     // Get app directory for photos
     final appDir = await getApplicationDocumentsDirectory();
     final photosDir = Directory(path.join(appDir.path, 'photos', 'originals'));
@@ -83,11 +87,14 @@ class CameraService {
     final file = File(savedPath);
     final fileSize = await file.length();
 
+    // Convert to stored (relative) path
+    final storedPath = PhotoStorageService.toStoredPath(savedPath);
+
     // Create Photo model with required GPS
     final photo = Photo(
       id: '${timestamp.millisecondsSinceEpoch}',
       equipmentId: equipmentId,
-      filePath: savedPath,
+      filePath: storedPath,
       latitude: position.latitude,
       longitude: position.longitude,
       timestamp: timestamp,
@@ -108,16 +115,15 @@ class CameraService {
   }
 
   // Get photo file path
-  Future<String> getPhotoPath(String fileName) async {
-    final appDir = await getApplicationDocumentsDirectory();
-    return path.join(appDir.path, 'photos', fileName);
+  Future<String> getPhotoPath(String storedPath) async {
+    await PhotoStorageService.ensureInitialized();
+    return PhotoStorageService.resolveAbsolutePath(storedPath);
   }
 
   // Delete photo file
-  Future<void> deletePhoto(String fileName) async {
-    final filePath = await getPhotoPath(fileName);
-    final file = File(filePath);
-    if (await file.exists()) {
+  Future<void> deletePhoto(String storedPath) async {
+    final file = PhotoStorageService.tryResolveLocalFile(storedPath);
+    if (file != null && await file.exists()) {
       await file.delete();
     }
   }
@@ -185,8 +191,10 @@ class CameraService {
       return _memoryCache[filePath]!;
     }
 
+    final absolutePath = PhotoStorageService.resolveAbsolutePath(filePath);
+
     // Load from disk
-    final file = File(filePath);
+    final file = File(absolutePath);
     if (!await file.exists()) {
       throw Exception('Photo file not found: $filePath');
     }
@@ -204,7 +212,8 @@ class CameraService {
     String filePath, {
     int width = 200,
   }) async {
-    final thumbnailPath = _getThumbnailPath(filePath);
+    final absolutePath = PhotoStorageService.resolveAbsolutePath(filePath);
+    final thumbnailPath = _getThumbnailPath(absolutePath);
     final thumbnailFile = File(thumbnailPath);
 
     // Return cached thumbnail if exists

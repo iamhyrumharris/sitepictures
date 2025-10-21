@@ -20,6 +20,11 @@ class Photo {
   final String? folderId;
   final String? folderName;
   final BeforeAfter? beforeAfter;
+  final String? equipmentName;
+  final String? clientName;
+  final String? mainSiteName;
+  final String? subSiteName;
+  final String? locationSummary;
 
   Photo({
     String? id,
@@ -39,6 +44,11 @@ class Photo {
     this.folderId,
     this.folderName,
     this.beforeAfter,
+    this.equipmentName,
+    this.clientName,
+    this.mainSiteName,
+    this.subSiteName,
+    this.locationSummary,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now();
 
@@ -97,6 +107,11 @@ class Photo {
       beforeAfter: map['before_after'] != null
           ? BeforeAfter.fromDb(map['before_after'])
           : null,
+      equipmentName: map['equipment_name'],
+      clientName: map['client_name'],
+      mainSiteName: map['main_site_name'],
+      subSiteName: map['sub_site_name'],
+      locationSummary: map['location_summary'],
     );
   }
 
@@ -120,6 +135,11 @@ class Photo {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
+      equipmentName: json['equipmentName'],
+      clientName: json['clientName'],
+      mainSiteName: json['mainSiteName'],
+      subSiteName: json['subSiteName'],
+      locationSummary: json['locationSummary'],
     );
   }
 
@@ -134,6 +154,11 @@ class Photo {
       'capturedBy': capturedBy,
       'fileSize': fileSize,
       'remoteUrl': remoteUrl,
+      'equipmentName': equipmentName,
+      'clientName': clientName,
+      'mainSiteName': mainSiteName,
+      'subSiteName': subSiteName,
+      'locationSummary': locationSummary,
     };
   }
 
@@ -146,6 +171,11 @@ class Photo {
     String? folderId,
     String? folderName,
     BeforeAfter? beforeAfter,
+    String? equipmentName,
+    String? clientName,
+    String? mainSiteName,
+    String? subSiteName,
+    String? locationSummary,
   }) {
     return Photo(
       id: id,
@@ -164,6 +194,11 @@ class Photo {
       folderId: folderId ?? this.folderId,
       folderName: folderName ?? this.folderName,
       beforeAfter: beforeAfter ?? this.beforeAfter,
+      equipmentName: equipmentName ?? this.equipmentName,
+      clientName: clientName ?? this.clientName,
+      mainSiteName: mainSiteName ?? this.mainSiteName,
+      subSiteName: subSiteName ?? this.subSiteName,
+      locationSummary: locationSummary ?? this.locationSummary,
     );
   }
 

@@ -7,7 +7,7 @@ import '../../providers/folder_provider.dart';
 import '../../widgets/photo_delete_dialog.dart';
 import '../../widgets/bottom_nav.dart';
 import '../../services/database_service.dart';
-import 'dart:io';
+import '../../services/photo_storage_service.dart';
 
 class FolderDetailScreen extends StatefulWidget {
   final String equipmentId;
@@ -26,6 +26,7 @@ class FolderDetailScreen extends StatefulWidget {
 class _FolderDetailScreenState extends State<FolderDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _activeTabIndex = 0;
   List<Photo> _beforePhotos = [];
   List<Photo> _afterPhotos = [];
   bool _isLoading = true;
@@ -35,6 +36,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _activeTabIndex = _tabController.index;
+    _tabController.addListener(_handleTabChange);
     // Defer loading until after the first frame to avoid calling setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadPhotos();
@@ -43,8 +46,19 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      // Ignore intermediate values while the controller animates between tabs.
+      return;
+    }
+
+    // Track the active tab so camera saves to the matching before/after category.
+    _activeTabIndex = _tabController.index;
   }
 
   Future<void> _loadPhotos() async {
@@ -67,7 +81,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
   }
 
   void _capturePhotos() async {
-    final currentTab = _tabController.index;
+    final currentTab = _activeTabIndex;
     final beforeAfter = currentTab == 0
         ? BeforeAfter.before
         : BeforeAfter.after;
@@ -116,14 +130,15 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
 
         // Delete photo files from storage
         try {
-          final photoFile = File(photo.filePath);
-          if (await photoFile.exists()) {
+          final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+          if (photoFile != null && await photoFile.exists()) {
             await photoFile.delete();
           }
 
           if (photo.thumbnailPath != null) {
-            final thumbnailFile = File(photo.thumbnailPath!);
-            if (await thumbnailFile.exists()) {
+            final thumbnailFile =
+                PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
+            if (thumbnailFile != null && await thumbnailFile.exists()) {
               await thumbnailFile.delete();
             }
           }
@@ -162,6 +177,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
         title: Text(_folderName.isEmpty ? 'Folder' : _folderName),
         bottom: TabBar(
           controller: _tabController,
+          onTap: (index) {
+            _activeTabIndex = index;
+          },
           tabs: [
             Tab(text: 'Before (${_beforePhotos.length})'),
             Tab(text: 'After (${_afterPhotos.length})'),
@@ -291,13 +309,28 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
     // Try thumbnail first, then fall back to full photo
     final imagePath = photo.thumbnailPath ?? photo.filePath;
 
-    return Image.file(
-      File(imagePath),
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return const Icon(Icons.image, size: 40, color: Colors.grey);
-      },
-    );
+    final localFile = PhotoStorageService.tryResolveLocalFile(imagePath);
+
+    if (localFile != null) {
+      return Image.file(
+        localFile,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.image, size: 40, color: Colors.grey);
+        },
+      );
+    }
+
+    if (photo.remoteUrl != null && photo.remoteUrl!.isNotEmpty) {
+      return Image.network(
+        photo.remoteUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, _, __) =>
+            const Icon(Icons.image, size: 40, color: Colors.grey),
+      );
+    }
+
+    return const Icon(Icons.image, size: 40, color: Colors.grey);
   }
 
   void _showPhotoContextMenu(Photo photo) {

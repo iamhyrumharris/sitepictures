@@ -99,6 +99,11 @@ const Photo = sequelize.define('Photo', {
       fields: ['fileHash'],
       unique: true,
     },
+    {
+      fields: ['capturedAt'],
+      using: 'BTREE',
+      order: 'DESC',
+    },
   ],
 });
 

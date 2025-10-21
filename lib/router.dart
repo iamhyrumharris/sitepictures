@@ -17,6 +17,7 @@ import 'screens/shell_scaffold.dart';
 import 'screens/equipment/folder_detail_screen.dart';
 import 'screens/needs_assigned_page.dart';
 import 'screens/photo_viewer_screen.dart';
+import 'screens/all_photos/all_photos_screen.dart';
 import 'services/auth_service.dart';
 import 'providers/needs_assigned_provider.dart';
 import 'models/camera_context.dart';
@@ -55,7 +56,7 @@ class AppRouter {
           final location = state.matchedLocation;
           if (location.startsWith('/home')) {
             currentIndex = 0;
-          } else if (location.startsWith('/map')) {
+          } else if (location.startsWith('/all-photos')) {
             currentIndex = 1;
           } else if (location.startsWith('/settings')) {
             currentIndex = 2;
@@ -87,17 +88,11 @@ class AppRouter {
             builder: (context, state) => const NeedsAssignedPage(),
           ),
 
-          // Map
+          // All Photos Screen
           GoRoute(
-            path: '/map',
-            name: 'map',
-            builder: (context, state) => Scaffold(
-              appBar: AppBar(
-                title: const Text('Map'),
-                backgroundColor: const Color(0xFF4A90E2),
-              ),
-              body: const Center(child: Text('Map view - Coming soon')),
-            ),
+            path: '/all-photos',
+            name: 'allPhotos',
+            builder: (context, state) => const AllPhotosScreen(),
           ),
 
           // Settings

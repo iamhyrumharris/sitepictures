@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:intl/intl.dart';
-import 'dart:io';
+import 'package:provider/provider.dart';
+
 import '../models/photo.dart';
+import '../providers/all_photos_provider.dart';
 import '../widgets/photo_delete_dialog.dart';
 import '../services/database_service.dart';
+import '../services/photo_storage_service.dart';
 
 /// Full-screen photo viewer with swipe navigation
 /// Supports viewing multiple photos with carousel navigation,
@@ -84,12 +87,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
           // Top overlay (app bar)
           if (_showOverlay)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _buildTopOverlay(),
-            ),
+            Positioned(top: 0, left: 0, right: 0, child: _buildTopOverlay()),
 
           // Bottom overlay (photo info)
           if (_showOverlay)
@@ -105,38 +103,48 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Widget _buildPhotoPage(Photo photo) {
-    // Use full resolution photo, fallback to thumbnail if full photo not available
-    final imagePath = photo.filePath;
-    final imageFile = File(imagePath);
+    final localFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+    final remoteUrl = photo.remoteUrl;
 
     return InteractiveViewer(
       minScale: 0.5,
       maxScale: 4.0,
       child: Center(
-        child: FutureBuilder<bool>(
-          future: imageFile.exists(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator(
-                color: Colors.white,
-              );
-            }
+        child: localFile != null
+            ? FutureBuilder<bool>(
+                future: localFile.exists(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator(color: Colors.white);
+                  }
 
-            if (snapshot.hasData && snapshot.data == true) {
-              return Image.file(
-                imageFile,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildErrorWidget();
+                  if (snapshot.hasData && snapshot.data == true) {
+                    return Image.file(
+                      localFile,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildErrorWidget();
+                      },
+                    );
+                  }
+
+                  return _buildRemoteContent(remoteUrl);
                 },
-              );
-            }
-
-            return _buildErrorWidget();
-          },
-        ),
+              )
+            : _buildRemoteContent(remoteUrl),
       ),
     );
+  }
+
+  Widget _buildRemoteContent(String? remoteUrl) {
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      return Image.network(
+        remoteUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (context, _, __) => _buildErrorWidget(),
+      );
+    }
+    return _buildErrorWidget();
   }
 
   Widget _buildErrorWidget() {
@@ -161,10 +169,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.7),
-            Colors.transparent,
-          ],
+          colors: [Colors.black.withOpacity(0.7), Colors.transparent],
         ),
       ),
       child: SafeArea(
@@ -199,10 +204,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [
-            Colors.black.withOpacity(0.7),
-            Colors.transparent,
-          ],
+          colors: [Colors.black.withOpacity(0.7), Colors.transparent],
         ),
       ),
       child: SafeArea(
@@ -215,14 +217,15 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               // Date/Time
               Row(
                 children: [
-                  const Icon(Icons.calendar_today, color: Colors.white, size: 16),
+                  const Icon(
+                    Icons.calendar_today,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     dateFormat.format(photo.timestamp),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
               ),
@@ -235,10 +238,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${photo.latitude.toStringAsFixed(6)}, ${photo.longitude.toStringAsFixed(6)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
               ),
@@ -252,10 +252,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     const SizedBox(width: 8),
                     Text(
                       photo.folderName!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                     if (photo.beforeAfter != null) ...[
                       const SizedBox(width: 8),
@@ -292,10 +289,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   const SizedBox(width: 8),
                   Text(
                     _formatFileSize(photo.fileSize),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
               ),
@@ -336,20 +330,25 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
         // Delete photo files from storage
         try {
-          final photoFile = File(photo.filePath);
-          if (await photoFile.exists()) {
+          final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+          if (photoFile != null && await photoFile.exists()) {
             await photoFile.delete();
           }
 
           if (photo.thumbnailPath != null) {
-            final thumbnailFile = File(photo.thumbnailPath!);
-            if (await thumbnailFile.exists()) {
+            final thumbnailFile =
+                PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
+            if (thumbnailFile != null && await thumbnailFile.exists()) {
               await thumbnailFile.delete();
             }
           }
         } catch (e) {
           debugPrint('Error deleting photo files: $e');
         }
+
+        final allPhotosProvider = _resolveAllPhotosProvider(context);
+        allPhotosProvider?.removePhoto(photo.id);
+        allPhotosProvider?.invalidate();
 
         // Remove from local list
         setState(() {
@@ -391,5 +390,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         }
       }
     }
+  }
+}
+
+AllPhotosProvider? _resolveAllPhotosProvider(BuildContext context) {
+  try {
+    return Provider.of<AllPhotosProvider>(context, listen: false);
+  } catch (_) {
+    return null;
   }
 }

@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/photo.dart';
 import '../../providers/app_state.dart';
-import '../../widgets/folder_badge.dart';
 import '../../widgets/photo_delete_dialog.dart';
+import '../../widgets/photo_grid_tile.dart';
 import '../../services/database_service.dart';
-import 'dart:io';
+import '../../services/photo_storage_service.dart';
 
 class AllPhotosTab extends StatefulWidget {
   final String equipmentId;
@@ -76,14 +76,15 @@ class _AllPhotosTabState extends State<AllPhotosTab>
 
         // Delete photo files from storage
         try {
-          final photoFile = File(photo.filePath);
-          if (await photoFile.exists()) {
+          final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+          if (photoFile != null && await photoFile.exists()) {
             await photoFile.delete();
           }
 
           if (photo.thumbnailPath != null) {
-            final thumbnailFile = File(photo.thumbnailPath!);
-            if (await thumbnailFile.exists()) {
+            final thumbnailFile =
+                PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
+            if (thumbnailFile != null && await thumbnailFile.exists()) {
               await thumbnailFile.delete();
             }
           }
@@ -157,59 +158,19 @@ class _AllPhotosTabState extends State<AllPhotosTab>
         itemCount: _photos.length,
         itemBuilder: (context, index) {
           final photo = _photos[index];
-          return _buildPhotoTile(photo);
+          return PhotoGridTile(
+            photo: photo,
+            onTap: () {
+              // Navigate to photo viewer with all photos
+              context.push(
+                '/photo-viewer',
+                extra: {'photos': _photos, 'initialIndex': index},
+              );
+            },
+            onLongPress: () => _showPhotoContextMenu(photo),
+          );
         },
       ),
-    );
-  }
-
-  Widget _buildPhotoTile(Photo photo) {
-    final photoIndex = _photos.indexOf(photo);
-
-    return GestureDetector(
-      onTap: () {
-        // Navigate to photo viewer with all photos
-        context.push('/photo-viewer', extra: {
-          'photos': _photos,
-          'initialIndex': photoIndex,
-        });
-      },
-      onLongPress: () {
-        _showPhotoContextMenu(photo);
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Photo thumbnail
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _buildPhotoImage(photo),
-            ),
-          ),
-
-          // Folder badge if photo is in a folder
-          if (photo.folderId != null && photo.folderName != null)
-            FolderBadge(folderName: photo.folderName!),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPhotoImage(Photo photo) {
-    // Try thumbnail first, then fall back to full photo
-    final imagePath = photo.thumbnailPath ?? photo.filePath;
-
-    return Image.file(
-      File(imagePath),
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return const Icon(Icons.image, size: 40, color: Colors.grey);
-      },
     );
   }
 

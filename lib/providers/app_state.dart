@@ -56,7 +56,9 @@ class AppState extends ChangeNotifier {
       // Filter out system clients (is_system = 0) from user-facing lists
       final List<Map<String, dynamic>> maps = await db.query(
         'clients',
-        where: isActive != null ? 'is_active = ? AND is_system = 0' : 'is_system = 0',
+        where: isActive != null
+            ? 'is_active = ? AND is_system = 0'
+            : 'is_system = 0',
         whereArgs: isActive != null ? [isActive ? 1 : 0] : null,
         orderBy: 'name ASC',
       );
@@ -398,6 +400,64 @@ class AppState extends ChangeNotifier {
       setError('Failed to load photos: $e');
       return [];
     }
+  }
+
+  Future<List<Photo>> getAllPhotos({
+    int limit = 50,
+    int offset = 0,
+    DateTime? before,
+  }) async {
+    try {
+      final maps = await _dbService.getAllPhotos(
+        limit: limit,
+        offset: offset,
+        before: before,
+      );
+      return maps
+          .map((map) {
+            final photo = Photo.fromMap(map);
+            final summary = buildLocationSummary(photo);
+            if (summary == null || summary == photo.locationSummary) {
+              return photo;
+            }
+            return photo.copyWith(locationSummary: summary);
+          })
+          .toList(growable: false);
+    } catch (e) {
+      setError('Failed to load all photos: $e');
+      return [];
+    }
+  }
+
+  String? buildLocationSummary(Photo photo) {
+    final existing = photo.locationSummary?.trim();
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final segments = <String>[];
+    final subSite = photo.subSiteName?.trim();
+    if (subSite != null && subSite.isNotEmpty) {
+      segments.add(subSite);
+    }
+    final mainSite = photo.mainSiteName?.trim();
+    if (mainSite != null && mainSite.isNotEmpty) {
+      segments.add(mainSite);
+    }
+    final client = photo.clientName?.trim();
+    if (client != null && client.isNotEmpty) {
+      segments.add(client);
+    }
+    if (segments.isEmpty) {
+      final equipment = photo.equipmentName?.trim();
+      if (equipment != null && equipment.isNotEmpty) {
+        segments.add(equipment);
+      }
+    }
+    if (segments.isEmpty) {
+      return null;
+    }
+    return segments.join(' • ');
   }
 
   // Folder methods (T008)
