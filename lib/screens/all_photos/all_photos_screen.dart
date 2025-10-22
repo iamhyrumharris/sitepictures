@@ -62,7 +62,21 @@ class _AllPhotosScreenState extends State<AllPhotosScreen>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('All Photos')),
+      appBar: AppBar(
+        title: const Text('All Photos'),
+        actions: [
+          Consumer<AllPhotosProvider>(
+            builder: (context, provider, _) {
+              final isBusy = provider.isLoading || provider.isRefreshing;
+              return IconButton(
+                tooltip: 'Refresh',
+                icon: const Icon(Icons.refresh),
+                onPressed: isBusy ? null : provider.refresh,
+              );
+            },
+          ),
+        ],
+      ),
       body: Consumer<AllPhotosProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.photos.isEmpty) {

@@ -684,9 +684,9 @@ class DatabaseService {
     DateTime? before,
   }) async {
     final db = await database;
-    final beforeClause = before != null
-        ? 'AND datetime(p.timestamp) < datetime(?)'
-        : '';
+    const timestampExpr = 'datetime(COALESCE(p.timestamp, p.created_at))';
+    final beforeClause =
+        before != null ? 'AND $timestampExpr < datetime(?)' : '';
     final args = <Object?>[];
     if (before != null) {
       args.add(before.toIso8601String());
@@ -721,12 +721,11 @@ class DatabaseService {
         e.client_id
       )
       WHERE e.is_active = 1
-        AND p.is_deleted = 0
         AND (ms.id IS NULL OR ms.is_active = 1)
         AND (ss.id IS NULL OR ss.is_active = 1)
         AND (c.id IS NULL OR c.is_active = 1)
         $beforeClause
-      ORDER BY datetime(p.timestamp) DESC, datetime(p.created_at) DESC
+      ORDER BY $timestampExpr DESC, datetime(p.created_at) DESC
       LIMIT ? OFFSET ?
     ''';
 

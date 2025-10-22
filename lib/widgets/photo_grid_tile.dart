@@ -13,7 +13,7 @@ class PhotoGridTile extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.showMetadata = false,
-    this.cornerRadius = 12,
+    this.cornerRadius = 0,
   });
 
   final Photo photo;

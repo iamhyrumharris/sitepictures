@@ -92,15 +92,14 @@ class Photo {
       thumbnailPath: map['thumbnail_path'],
       latitude: map['latitude'].toDouble(),
       longitude: map['longitude'].toDouble(),
-      timestamp: DateTime.parse(map['timestamp']),
+      timestamp:
+          _parseDate(map['timestamp']) ?? _parseDate(map['created_at'])!,
       capturedBy: map['captured_by'],
       fileSize: map['file_size'],
       isSynced: map['is_synced'] == 1,
       syncedAt: map['synced_at'],
       remoteUrl: map['remote_url'],
-      createdAt: map['created_at'] != null
-          ? DateTime.parse(map['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDate(map['created_at']) ?? DateTime.now(),
       // Virtual fields from JOIN queries
       folderId: map['folder_id'],
       folderName: map['folder_name'],
@@ -126,15 +125,16 @@ class Photo {
       thumbnailPath: null,
       latitude: json['latitude'].toDouble(),
       longitude: json['longitude'].toDouble(),
-      timestamp: DateTime.parse(json['timestamp']),
+      timestamp:
+          _parseDate(json['timestamp']) ??
+          _parseDate(json['createdAt']) ??
+          DateTime.now(),
       capturedBy: json['capturedBy'],
       fileSize: json['fileSize'],
       isSynced: true,
       syncedAt: json['syncedAt'],
       remoteUrl: json['remoteUrl'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
       equipmentName: json['equipmentName'],
       clientName: json['clientName'],
       mainSiteName: json['mainSiteName'],
@@ -215,4 +215,18 @@ class Photo {
 
   @override
   int get hashCode => id.hashCode;
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    final parsed = value.toString();
+    if (parsed.isEmpty) {
+      return null;
+    }
+    return DateTime.parse(parsed);
+  }
 }

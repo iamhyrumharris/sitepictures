@@ -111,5 +111,44 @@ void main() {
     expect(tiles.length, 2);
     final firstTile = tiles.first as PhotoGridTile;
     expect(firstTile.photo.id, 'photo-1');
+    expect(firstTile.showMetadata, isFalse);
+  });
+
+  testWidgets('refresh button triggers provider refresh', (tester) async {
+    final now = DateTime.now();
+    final initialCompleter = Completer<List<Photo>>();
+    final refreshCompleter = Completer<List<Photo>>();
+    final provider = AllPhotosProvider(pageSize: 2);
+    provider.updateAppState(
+      _WidgetStubAppState([
+        initialCompleter.future,
+        refreshCompleter.future,
+      ]),
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(home: AllPhotosScreen()),
+      ),
+    );
+
+    initialCompleter.complete([_buildPhoto(1, now)]);
+    await tester.pumpAndSettle();
+
+    expect(provider.isRefreshing, isFalse);
+
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pump();
+
+    expect(provider.isRefreshing, isTrue);
+
+    refreshCompleter.complete([
+      _buildPhoto(1, now),
+      _buildPhoto(2, now.subtract(const Duration(minutes: 2))),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(provider.isRefreshing, isFalse);
   });
 }
