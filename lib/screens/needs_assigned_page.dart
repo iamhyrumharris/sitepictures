@@ -19,6 +19,7 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
   List<Map<String, dynamic>> _folders = [];
   List<Photo> _standalonePhotos = [];
   bool _isLoading = true;
+  String? _globalEquipmentId;
 
   // Selection mode state
   bool _isSelectionMode = false;
@@ -46,7 +47,12 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
       );
 
       if (globalEquipment.isEmpty) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _globalEquipmentId = null;
+          _folders = [];
+          _standalonePhotos = [];
+        });
         return;
       }
 
@@ -91,6 +97,7 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
       final standalonePhotos = standalonePhotoMaps.map((map) => Photo.fromMap(map)).toList();
 
       setState(() {
+        _globalEquipmentId = globalEquipmentId;
         _folders = folders;
         _standalonePhotos = standalonePhotos;
         _isLoading = false;
@@ -264,6 +271,7 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
   Widget _buildFolderCard(Map<String, dynamic> folder) {
     final name = folder['name'] as String;
     final createdAt = DateTime.parse(folder['created_at'] as String);
+    final folderId = folder['id'] as String?;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -272,13 +280,21 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
         title: Text(name),
         subtitle: Text('Created ${_formatDate(createdAt)}'),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          // TODO: Navigate to folder detail page
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Folder detail view coming soon'),
-            ),
-          );
+        onTap: () async {
+          final equipmentId = _globalEquipmentId;
+          if (equipmentId == null || folderId == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Unable to open folder right now')),
+              );
+            }
+            return;
+          }
+
+          await context.push('/equipment/$equipmentId/folder/$folderId');
+          if (mounted) {
+            await _loadNeedsAssigned();
+          }
         },
       ),
     );

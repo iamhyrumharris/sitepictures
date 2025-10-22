@@ -315,7 +315,7 @@ class _EquipmentScreenState extends State<EquipmentScreen>
       return FloatingActionButton(
         heroTag: 'equipment_camera_fab_${widget.equipmentId}',
         onPressed: _openQuickCapture,
-        backgroundColor: const Color(0xFF4A90E2),
+        backgroundColor: const Color(0xFF10B981),
         child: const Icon(Icons.camera_alt),
         tooltip: 'Quick Capture',
       );

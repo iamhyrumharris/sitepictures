@@ -58,7 +58,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
     }
 
     // Track the active tab so camera saves to the matching before/after category.
-    _activeTabIndex = _tabController.index;
+    final newIndex = _tabController.index;
+    if (newIndex != _activeTabIndex) {
+      setState(() {
+        _activeTabIndex = newIndex;
+      });
+    }
   }
 
   Future<void> _loadPhotos() async {
@@ -178,7 +183,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
         bottom: TabBar(
           controller: _tabController,
           onTap: (index) {
-            _activeTabIndex = index;
+            if (_activeTabIndex != index) {
+              setState(() {
+                _activeTabIndex = index;
+              });
+            }
           },
           tabs: [
             Tab(text: 'Before (${_beforePhotos.length})'),
@@ -204,9 +213,14 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
               ],
             ),
       bottomNavigationBar: const BottomNav(currentIndex: -1),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _capturePhotos,
-        child: const Icon(Icons.camera_alt),
+        icon: const Icon(Icons.camera_alt),
+        label: Text(
+          _activeTabIndex == 0
+              ? 'Capture Before Photos'
+              : 'Capture After Photos',
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );

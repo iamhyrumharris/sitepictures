@@ -1,7 +1,7 @@
 /// Quick Save type enumeration
 enum QuickSaveType {
   singlePhoto, // 1 photo → "Image - YYYY-MM-DD"
-  folder, // 2+ photos → "Folder - YYYY-MM-DD"
+  folder, // 2+ photos → "YYYY-MM-DD HH-mm"
 }
 
 /// Result entity for Quick Save operations

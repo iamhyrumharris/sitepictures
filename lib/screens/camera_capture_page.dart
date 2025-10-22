@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../providers/auth_state.dart';
 import '../providers/photo_capture_provider.dart';
 import '../providers/equipment_navigator_provider.dart';
 import '../providers/all_photos_provider.dart';
@@ -10,10 +11,12 @@ import '../widgets/photo_thumbnail_strip.dart';
 import '../widgets/capture_button.dart';
 import '../widgets/context_aware_save_buttons.dart';
 import '../widgets/save_progress_indicator.dart';
+import '../widgets/create_folder_dialog.dart';
 import '../models/folder_photo.dart';
 import '../models/photo_folder.dart';
 import '../models/camera_context.dart';
 import '../models/equipment.dart';
+import '../models/save_result.dart';
 import '../services/folder_service.dart';
 import '../services/quick_save_service.dart';
 import '../services/photo_save_service.dart';
@@ -155,15 +158,12 @@ class _CameraCapturePageState extends State<CameraCapturePage>
 
   /// T022-T023: Home context - Next button handler with equipment navigator
   Future<void> _handleNext(BuildContext context) async {
-    // Use class-level provider reference instead of context to avoid modal scope issues
     if (_provider == null || !_provider!.hasPhotos) {
       return;
     }
 
-    // Close modal
     Navigator.of(context).pop();
 
-    // Open equipment navigator in a separate provider context
     if (!mounted) return;
     final equipment = await Navigator.of(context).push<Equipment>(
       MaterialPageRoute(
@@ -175,88 +175,202 @@ class _CameraCapturePageState extends State<CameraCapturePage>
       ),
     );
 
-    // If user cancelled navigation, preserve session
     if (equipment == null) {
       return;
     }
 
-    // Initialize services for save
+    if (!mounted) return;
+    final option = await _showNextSaveOptions(context, equipment);
+
+    if (option == null) {
+      return;
+    }
+
+    switch (option) {
+      case _NextSaveOption.createFolder:
+        await _handleCreateNewFolderOption(context, equipment);
+        break;
+      case _NextSaveOption.existingFolder:
+        await _handleAddToExistingFolderOption(context, equipment);
+        break;
+    }
+  }
+
+  Future<void> _handleCreateNewFolderOption(
+    BuildContext context,
+    Equipment equipment,
+  ) async {
+    final workOrder = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const CreateFolderDialog(),
+    );
+
+    if (workOrder == null || workOrder.trim().isEmpty) {
+      return;
+    }
+
+    if (!mounted) return;
+    final category = await _promptBeforeAfterSelection(
+      context: context,
+      title: 'Save photos to Before or After?',
+      message:
+          'Folders support Before and After sections. Choose where these photos belong.',
+    );
+
+    if (category == null) {
+      return;
+    }
+
+    final authState = context.read<AuthState>();
+    final currentUser = authState.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No user is signed in. Please sign in and try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final folderService = FolderService();
+    PhotoFolder folder;
+
+    try {
+      folder = await folderService.createFolder(
+        equipmentId: equipment.id,
+        workOrder: workOrder.trim(),
+        createdBy: currentUser.id,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to create folder: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await _performSaveOperation(
+      context: context,
+      progressTitle: 'Saving to ${folder.name} '
+          '(${category == BeforeAfter.before ? 'Before' : 'After'})',
+      saveOperation: (service) => service.saveToFolder(
+        photos: _provider!.session.photos,
+        folder: folder,
+        category: category,
+      ),
+    );
+  }
+
+  Future<void> _handleAddToExistingFolderOption(
+    BuildContext context,
+    Equipment equipment,
+  ) async {
+    final folderService = FolderService();
+    List<PhotoFolder> folders;
+
+    try {
+      folders = await folderService.getFolders(equipment.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load folders: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (folders.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No folders available on this equipment yet.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final folder = await _promptExistingFolderSelection(
+      context: context,
+      folders: folders,
+    );
+
+    if (folder == null) {
+      return;
+    }
+
+    if (!mounted) return;
+    final category = await _promptBeforeAfterSelection(
+      context: context,
+      title: 'Add photos to Before or After?',
+      message: 'Choose the section in ${folder.name} for these photos.',
+    );
+
+    if (category == null) {
+      return;
+    }
+
+    if (!mounted) return;
+    await _performSaveOperation(
+      context: context,
+      progressTitle: 'Saving to ${folder.name} '
+          '(${category == BeforeAfter.before ? 'Before' : 'After'})',
+      saveOperation: (service) => service.saveToFolder(
+        photos: _provider!.session.photos,
+        folder: folder,
+        category: category,
+      ),
+    );
+  }
+
+  Future<void> _performSaveOperation({
+    required BuildContext context,
+    required String progressTitle,
+    required Future<SaveResult> Function(PhotoSaveService service) saveOperation,
+  }) async {
     final photoSaveService = PhotoSaveService(
       databaseService: DatabaseService(),
       storageService: PhotoStorageService(),
       allPhotosProvider: context.read<AllPhotosProvider>(),
     );
 
-    // Show loading dialog with progress indicator
     if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => SaveProgressDialog(
+      builder: (dialogContext) => SaveProgressDialog(
         progressStream: photoSaveService.progressStream,
-        title: 'Saving to ${equipment.name}',
+        title: progressTitle,
       ),
     );
 
     try {
-      // Save photos to selected equipment
-      final result = await photoSaveService.saveToEquipment(
-        photos: _provider!.session.photos,
-        equipment: equipment,
-      );
+      final result = await saveOperation(photoSaveService);
 
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
-
-      // Show result message
-      if (!mounted) return;
-      if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.getUserMessage()),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Complete session and return to home
-        _provider!.completeSession();
-        if (mounted) Navigator.of(context).pop();
-      } else if (result.successfulCount > 0) {
-        // Partial save
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.getUserMessage()),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-
-        _provider!.completeSession();
-        if (mounted) Navigator.of(context).pop();
-      } else {
-        // Critical failure
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.error ?? 'Save failed'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-
-        if (!result.sessionPreserved) {
-          _provider!.completeSession();
-          if (mounted) Navigator.of(context).pop();
-        }
-      }
-    } catch (e) {
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
-
-      // Show error
       if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _processSaveResult(result);
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Save failed: ${e.toString()}'),
+            content: Text('Save failed: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),
@@ -265,6 +379,156 @@ class _CameraCapturePageState extends State<CameraCapturePage>
     } finally {
       photoSaveService.dispose();
     }
+  }
+
+  void _processSaveResult(SaveResult result) {
+    if (!mounted) {
+      return;
+    }
+
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.getUserMessage()),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      _provider!.completeSession();
+      Navigator.of(context).pop();
+    } else if (result.successfulCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.getUserMessage()),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      _provider!.completeSession();
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error ?? 'Save failed'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      if (!result.sessionPreserved) {
+        _provider!.completeSession();
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  Future<_NextSaveOption?> _showNextSaveOptions(
+    BuildContext context,
+    Equipment equipment,
+  ) {
+    return showModalBottomSheet<_NextSaveOption>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Save to ${equipment.name}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.create_new_folder),
+                title: const Text('Create New Folder'),
+                subtitle: const Text(
+                  'Make a new folder and add photos to Before or After.',
+                ),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_NextSaveOption.createFolder),
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder),
+                title: const Text('Add to Existing Folder'),
+                subtitle: const Text('Choose a folder under this equipment.'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_NextSaveOption.existingFolder),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<BeforeAfter?> _promptBeforeAfterSelection({
+    required BuildContext context,
+    required String title,
+    String? message,
+  }) {
+    return showDialog<BeforeAfter>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(title),
+        children: [
+          if (message != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 24, right: 24, bottom: 12),
+              child: Text(
+                message,
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(BeforeAfter.before),
+            child: const Text('Before'),
+          ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(BeforeAfter.after),
+            child: const Text('After'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<PhotoFolder?> _promptExistingFolderSelection({
+    required BuildContext context,
+    required List<PhotoFolder> folders,
+  }) {
+    return showDialog<PhotoFolder>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Select Folder'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 260,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: folders.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (itemContext, index) {
+              final folder = folders[index];
+              return ListTile(
+                title: Text(folder.name),
+                onTap: () => Navigator.of(dialogContext).pop(folder),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// T014-T015: Home context - Quick Save button handler
@@ -765,4 +1029,9 @@ class _CameraCapturePageState extends State<CameraCapturePage>
       ),
     );
   }
+}
+
+enum _NextSaveOption {
+  createFolder,
+  existingFolder,
 }
