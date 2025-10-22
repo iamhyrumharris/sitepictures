@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import '../models/folder_photo.dart';
 import '../models/photo_session.dart';
 import '../models/quick_save_item.dart';
 import '../models/save_result.dart';
@@ -55,9 +56,10 @@ class QuickSaveService {
       // Generate base name with current date
       final now = DateTime.now();
       final dateStr = DateFormat('yyyy-MM-dd').format(now);
+      final timeStr = DateFormat('yyyy-MM-dd HH-mm').format(now);
       final baseName = photos.length == 1
           ? 'Image - $dateStr'
-          : 'Folder - $dateStr';
+          : timeStr;
 
       // Get unique name with sequential numbering
       print('QuickSave: Generating unique name from base: "$baseName"');
@@ -95,7 +97,7 @@ class QuickSaveService {
             tempPhoto: tempPhoto,
             equipmentId: globalEquipmentId,
             folderId: folderId,
-            beforeAfter: folderId != null ? 'before' : null,
+            beforeAfter: folderId != null ? BeforeAfter.before : null,
           );
           savedIds.add(tempPhoto.id);
           print('QuickSave: Successfully saved photo ${tempPhoto.id}');
@@ -236,7 +238,7 @@ class QuickSaveService {
     required TempPhoto tempPhoto,
     required String equipmentId,
     String? folderId,
-    String? beforeAfter,
+    BeforeAfter? beforeAfter,
   }) async {
     final db = await _db.database;
 
@@ -274,7 +276,7 @@ class QuickSaveService {
         await txn.insert('folder_photos', {
           'folder_id': folderId,
           'photo_id': tempPhoto.id,
-          'before_after': beforeAfter,
+          'before_after': beforeAfter.toDb(),
           'added_at': DateTime.now().toIso8601String(),
         });
       }

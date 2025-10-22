@@ -11,9 +11,9 @@ class SequentialNamer {
   /// Generate a unique name by checking existing folders and appending sequential numbers
   ///
   /// Example:
-  /// - "Folder - 2025-10-13" (first occurrence)
-  /// - "Folder - 2025-10-13 (2)" (second occurrence)
-  /// - "Folder - 2025-10-13 (3)" (third occurrence)
+  /// - "2025-10-13 14-30" (first occurrence)
+  /// - "2025-10-13 14-30 (2)" (second occurrence)
+  /// - "2025-10-13 14-30 (3)" (third occurrence)
   Future<String> getUniqueFolderName({
     required String baseName,
     required String equipmentId,
