@@ -44,6 +44,32 @@ class FolderService {
     return map != null ? PhotoFolder.fromMap(map) : null;
   }
 
+  /// Rename an existing folder
+  Future<void> renameFolder({
+    required String folderId,
+    required String newName,
+  }) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Folder name cannot be empty.');
+    }
+    if (trimmed.length > 100) {
+      throw ArgumentError('Folder name too long (max 100 characters).');
+    }
+
+    final db = await _dbService.database;
+    final updated = await db.update(
+      'photo_folders',
+      {'name': trimmed},
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [folderId],
+    );
+
+    if (updated == 0) {
+      throw Exception('Folder not found or already deleted.');
+    }
+  }
+
   /// Delete a folder
   Future<void> deleteFolder({
     required String folderId,

@@ -10,6 +10,7 @@ import '../../../lib/models/save_context.dart';
 import '../../../lib/models/save_result.dart';
 import '../../../lib/models/equipment.dart';
 import '../../../lib/models/photo_folder.dart';
+import '../../../lib/models/folder_photo.dart';
 
 abstract class PhotoSaveService {
   /// Save photos to equipment's general photos collection (no folder association)

@@ -114,6 +114,27 @@ class FolderProvider extends ChangeNotifier {
     }
   }
 
+  /// Rename a folder
+  Future<bool> renameFolder({
+    required String folderId,
+    required String equipmentId,
+    required String newName,
+  }) async {
+    _setError(null);
+
+    try {
+      await _folderService.renameFolder(
+        folderId: folderId,
+        newName: newName,
+      );
+      await loadFolders(equipmentId);
+      return true;
+    } catch (e) {
+      _setError('Failed to rename folder: $e');
+      return false;
+    }
+  }
+
   /// Get before photos for a folder
   Future<List<Photo>> getBeforePhotos(String folderId) async {
     try {

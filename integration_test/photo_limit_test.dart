@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:sitepictures/main.dart' as app;
@@ -17,7 +16,7 @@ void main() {
   group('Photo Limit Integration Test', () {
     const String testEquipmentId = 'equipment-limit-test-001';
 
-    setUpAll() async {
+    setUpAll(() async {
       // Create test equipment
       final db = await dbService.database;
       await db.insert('equipment', {
@@ -29,15 +28,24 @@ void main() {
       });
     });
 
-    tearDownAll() async {
+    tearDownAll(() async {
       // Cleanup
       final db = await dbService.database;
-      await db.delete('photos', where: 'equipment_id = ?', whereArgs: [testEquipmentId]);
-      await db.delete('equipment', where: 'id = ?', whereArgs: [testEquipmentId]);
+      await db.delete(
+        'photos',
+        where: 'equipment_id = ?',
+        whereArgs: [testEquipmentId],
+      );
+      await db.delete(
+        'equipment',
+        where: 'id = ?',
+        whereArgs: [testEquipmentId],
+      );
     });
 
-    testWidgets('Should warn when approaching 90 photos',
-        (WidgetTester tester) async {
+    testWidgets('Should warn when approaching 90 photos', (
+      WidgetTester tester,
+    ) async {
       // Seed 90 photos for equipment
       final db = await dbService.database;
       for (int i = 0; i < 90; i++) {
@@ -58,14 +66,19 @@ void main() {
       final limitCheck = await cameraService.checkPhotoLimit(testEquipmentId);
 
       expect(limitCheck['count'], equals(90));
-      expect(limitCheck['showWarning'], isTrue, reason: 'Should warn at 90 photos');
+      expect(
+        limitCheck['showWarning'],
+        isTrue,
+        reason: 'Should warn at 90 photos',
+      );
       expect(limitCheck['atLimit'], isFalse, reason: 'Not at limit yet');
 
       print('✓ Warning shown at 90 photos');
     });
 
-    testWidgets('Should block capture at 100 photos',
-        (WidgetTester tester) async {
+    testWidgets('Should block capture at 100 photos', (
+      WidgetTester tester,
+    ) async {
       // Add 10 more photos to reach 100
       final db = await dbService.database;
       for (int i = 90; i < 100; i++) {
@@ -92,8 +105,9 @@ void main() {
       print('✓ Capture blocked at 100 photos');
     });
 
-    testWidgets('Should display exact error message at limit',
-        (WidgetTester tester) async {
+    testWidgets('Should display exact error message at limit', (
+      WidgetTester tester,
+    ) async {
       // Launch app and navigate to equipment with 100 photos
       app.main();
       await tester.pumpAndSettle();
@@ -104,8 +118,9 @@ void main() {
       print('✓ Photo limit error message validated');
     });
 
-    testWidgets('Should allow capture below 100 photos',
-        (WidgetTester tester) async {
+    testWidgets('Should allow capture below 100 photos', (
+      WidgetTester tester,
+    ) async {
       // Create equipment with only 50 photos
       const String testEquipId2 = 'equipment-limit-test-002';
 
@@ -143,12 +158,17 @@ void main() {
       print('✓ Capture allowed below 90 photos');
 
       // Cleanup
-      await db.delete('photos', where: 'equipment_id = ?', whereArgs: [testEquipId2]);
+      await db.delete(
+        'photos',
+        where: 'equipment_id = ?',
+        whereArgs: [testEquipId2],
+      );
       await db.delete('equipment', where: 'id = ?', whereArgs: [testEquipId2]);
     });
 
-    testWidgets('Warning message should indicate photo count',
-        (WidgetTester tester) async {
+    testWidgets('Warning message should indicate photo count', (
+      WidgetTester tester,
+    ) async {
       // At 95 photos, should show: "Warning: 95/100 photos. Approaching limit."
       const String testEquipId3 = 'equipment-limit-test-003';
 
@@ -184,7 +204,11 @@ void main() {
       print('✓ Warning message includes count at 95 photos');
 
       // Cleanup
-      await db.delete('photos', where: 'equipment_id = ?', whereArgs: [testEquipId3]);
+      await db.delete(
+        'photos',
+        where: 'equipment_id = ?',
+        whereArgs: [testEquipId3],
+      );
       await db.delete('equipment', where: 'id = ?', whereArgs: [testEquipId3]);
     });
   });
