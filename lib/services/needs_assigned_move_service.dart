@@ -70,6 +70,7 @@ class NeedsAssignedMoveService {
       await _updatePhotoEquipment(txn, allPhotoIds.toList(), targetEquipmentId);
 
       if (targetFolderId != null && targetCategory != null) {
+        await _validateTargetFolder(txn, targetFolderId, targetEquipmentId);
         await _associatePhotosToFolder(
           txn,
           allPhotoIds.toList(),
@@ -135,18 +136,7 @@ class NeedsAssignedMoveService {
     final db = await _dbService.database;
 
     return await db.transaction((txn) async {
-      // Validate target folder belongs to target equipment
-      final targetFolder = await txn.query(
-        'photo_folders',
-        columns: ['id'],
-        where: 'id = ? AND equipment_id = ? AND is_deleted = 0',
-        whereArgs: [targetFolderId, targetEquipmentId],
-        limit: 1,
-      );
-
-      if (targetFolder.isEmpty) {
-        throw Exception('Target folder is no longer available.');
-      }
+      await _validateTargetFolder(txn, targetFolderId, targetEquipmentId);
 
       final folderPhotos = await _getFolderPhotos(
         txn,
@@ -242,6 +232,24 @@ class NeedsAssignedMoveService {
       where: 'photo_id IN ($placeholders)',
       whereArgs: photoIds,
     );
+  }
+
+  Future<void> _validateTargetFolder(
+    Transaction txn,
+    String folderId,
+    String expectedEquipmentId,
+  ) async {
+    final result = await txn.query(
+      'photo_folders',
+      columns: ['id'],
+      where: 'id = ? AND equipment_id = ? AND is_deleted = 0',
+      whereArgs: [folderId, expectedEquipmentId],
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      throw Exception('Target folder is no longer available.');
+    }
   }
 
   Future<void> _updatePhotoEquipment(
