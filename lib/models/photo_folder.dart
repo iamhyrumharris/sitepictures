@@ -17,10 +17,15 @@ class PhotoFolder {
     required this.createdBy,
     DateTime? createdAt,
     bool? isDeleted,
+    String? name,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        isDeleted = isDeleted ?? false,
-       name = _generateName(workOrder, createdAt ?? DateTime.now());
+       name = _normalizeName(
+         name,
+         workOrder,
+         createdAt ?? DateTime.now(),
+       );
 
   /// Generate folder name in format: "{work_order} - {YYYY-MM-DD}"
   static String _generateName(String workOrder, DateTime date) {
@@ -28,10 +33,22 @@ class PhotoFolder {
     return '$workOrder - $dateStr';
   }
 
+  static String _normalizeName(
+    String? providedName,
+    String workOrder,
+    DateTime createdAt,
+  ) {
+    final trimmed = providedName?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return _generateName(workOrder, createdAt);
+  }
+
   /// Validation
   bool isValid() {
     if (workOrder.isEmpty || workOrder.length > 50) return false;
-    if (name.length > 100) return false;
+    if (name.isEmpty || name.length > 100) return false;
     if (createdAt.isAfter(DateTime.now())) return false;
     if (equipmentId.isEmpty) return false;
     if (createdBy.isEmpty) return false;
@@ -56,6 +73,7 @@ class PhotoFolder {
     return PhotoFolder(
       id: map['id'],
       equipmentId: map['equipment_id'],
+      name: map['name'],
       workOrder: map['work_order'],
       createdBy: map['created_by'],
       createdAt: DateTime.parse(map['created_at']),
@@ -66,6 +84,7 @@ class PhotoFolder {
   /// Create copy with updates
   PhotoFolder copyWith({
     String? equipmentId,
+    String? name,
     String? workOrder,
     String? createdBy,
     DateTime? createdAt,
@@ -74,6 +93,7 @@ class PhotoFolder {
     return PhotoFolder(
       id: id,
       equipmentId: equipmentId ?? this.equipmentId,
+      name: name ?? this.name,
       workOrder: workOrder ?? this.workOrder,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,

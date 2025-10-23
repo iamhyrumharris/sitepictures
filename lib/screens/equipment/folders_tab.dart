@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/equipment.dart';
 import '../../models/photo_folder.dart';
 import '../../providers/folder_provider.dart';
+import '../../providers/equipment_navigator_provider.dart';
+import '../../services/needs_assigned_move_service.dart';
 import '../../widgets/delete_folder_dialog.dart';
+import '../../widgets/rename_folder_dialog.dart';
+import '../equipment_navigator_page.dart';
 
 class FoldersTab extends StatefulWidget {
   final String equipmentId;
@@ -58,6 +63,190 @@ class _FoldersTabState extends State<FoldersTab>
           context,
         ).showSnackBar(const SnackBar(content: Text('Folder deleted')));
       }
+    }
+  }
+
+  void _showFolderOptions(PhotoFolder folder, int photoCount) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.drive_file_move),
+              title: const Text('Move Folder'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _moveFolder(folder);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Rename Folder'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _renameFolder(folder);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete Folder'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _deleteFolder(folder, photoCount);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _renameFolder(PhotoFolder folder) async {
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => RenameFolderDialog(initialName: folder.name),
+    );
+
+    if (newName == null) {
+      return;
+    }
+
+    final trimmedName = newName.trim();
+    if (trimmedName.isEmpty || trimmedName == folder.name) {
+      return;
+    }
+
+    final folderProvider = context.read<FolderProvider>();
+    final success = await folderProvider.renameFolder(
+      folderId: folder.id,
+      equipmentId: widget.equipmentId,
+      newName: trimmedName,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Folder renamed')),
+      );
+      return;
+    }
+
+    final error = folderProvider.errorMessage;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to rename folder'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _moveFolder(PhotoFolder folder) async {
+    final equipment = await Navigator.of(context).push<Equipment>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (navigatorContext) => ChangeNotifierProvider(
+          create: (_) => EquipmentNavigatorProvider(),
+          child: const EquipmentNavigatorPage(),
+        ),
+      ),
+    );
+
+    if (!mounted || equipment == null) {
+      return;
+    }
+
+    if (equipment.id == widget.equipmentId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Folder is already on this equipment.'),
+        ),
+      );
+      return;
+    }
+
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    var progressOpen = false;
+
+    void closeProgress() {
+      if (progressOpen && rootNavigator.canPop()) {
+        rootNavigator.pop();
+        progressOpen = false;
+      }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+    progressOpen = true;
+
+    try {
+      final moveService = NeedsAssignedMoveService();
+      final summary = await moveService.moveFoldersToEquipment(
+        folderIds: [folder.id],
+        sourceEquipmentId: widget.equipmentId,
+        targetEquipmentId: equipment.id,
+      );
+
+      closeProgress();
+
+      if (!mounted) {
+        return;
+      }
+
+      final folderProvider = context.read<FolderProvider>();
+      await folderProvider.loadFolders(widget.equipmentId);
+
+      if (summary.hasChanges) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Folder moved to ${equipment.name}'),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () {
+                GoRouter.of(context).push('/equipment/${equipment.id}');
+              },
+              textColor: Colors.white,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No changes were made to the folder location.'),
+          ),
+        );
+      }
+    } catch (e) {
+      closeProgress();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to move folder: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      closeProgress();
     }
   }
 
@@ -134,6 +323,7 @@ class _FoldersTabState extends State<FoldersTab>
                 '/equipment/${widget.equipmentId}/folder/${folder.id}',
               );
             },
+            onLongPress: () => _showFolderOptions(folder, photoCount),
           ),
         );
       },
