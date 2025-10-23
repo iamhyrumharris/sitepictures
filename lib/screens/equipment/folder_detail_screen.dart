@@ -277,11 +277,11 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(3),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        crossAxisSpacing: 3,
+        mainAxisSpacing: 3,
         childAspectRatio: 1,
       ),
       itemCount: widget.photos.length,

@@ -15,6 +15,7 @@ import '../services/photo_storage_service.dart';
 import '../widgets/create_folder_dialog.dart';
 import '../widgets/needs_assigned_badge.dart';
 import '../widgets/rename_folder_dialog.dart';
+import '../widgets/fab_visibility_scope.dart';
 
 /// T016: Page to display global "Needs Assigned" photos and folders
 /// Shows all Quick Save items (single photos and folders) from home camera
@@ -37,6 +38,7 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
   bool _isSelectionMode = false;
   final Set<String> _selectedPhotoIds = {};
   final Set<String> _selectedFolderIds = {};
+  FabVisibilityController? _fabController;
 
   int get _selectedCount =>
       _selectedPhotoIds.length + _selectedFolderIds.length;
@@ -62,6 +64,16 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
   void initState() {
     super.initState();
     _loadNeedsAssigned();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = FabVisibilityScope.maybeOf(context);
+    if (!identical(controller, _fabController)) {
+      _fabController?.show();
+      _fabController = controller;
+    }
   }
 
   Future<void> _loadNeedsAssigned() async {
@@ -164,6 +176,7 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
 
   @override
   Widget build(BuildContext context) {
+    _updateFabVisibility();
     return Scaffold(
       appBar: _isSelectionMode ? _buildSelectionAppBar() : _buildNormalAppBar(),
       body: _isLoading
@@ -171,6 +184,12 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
           : _buildContent(),
       bottomNavigationBar: _isSelectionMode ? _buildSelectionActionBar() : null,
     );
+  }
+
+  @override
+  void dispose() {
+    _fabController?.show();
+    super.dispose();
   }
 
   PreferredSizeWidget _buildNormalAppBar() {
@@ -350,8 +369,8 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+                crossAxisSpacing: 3,
+                mainAxisSpacing: 3,
                 childAspectRatio: 1,
               ),
               itemCount: _standalonePhotos.length,
@@ -1497,6 +1516,14 @@ class _NeedsAssignedPageState extends State<NeedsAssignedPage> {
         ],
       ),
     );
+  }
+
+  void _updateFabVisibility() {
+    final controller = _fabController;
+    if (controller == null) {
+      return;
+    }
+    controller.setVisible(!_isSelectionMode);
   }
 }
 

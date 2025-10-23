@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/equipment.dart';
@@ -15,6 +16,7 @@ import '../../widgets/bottom_nav.dart';
 import '../../services/recent_locations_service.dart';
 import 'all_photos_tab.dart';
 import 'folders_tab.dart';
+import '../../widgets/fab_visibility_scope.dart';
 
 /// Equipment screen showing photos
 /// Implements FR-001, FR-002 (tab navigation), FR-007, FR-009
@@ -32,6 +34,7 @@ class _EquipmentScreenState extends State<EquipmentScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final GlobalKey _allPhotosKey = GlobalKey();
+  late final FabVisibilityController _fabVisibilityController;
   Client? _client;
   MainSite? _mainSite;
   SubSite? _subSite;
@@ -42,6 +45,8 @@ class _EquipmentScreenState extends State<EquipmentScreen>
   @override
   void initState() {
     super.initState();
+    _fabVisibilityController = FabVisibilityController()
+      ..addListener(_handleFabVisibilityChanged);
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       setState(() {}); // Rebuild to update FAB visibility
@@ -52,6 +57,9 @@ class _EquipmentScreenState extends State<EquipmentScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _fabVisibilityController
+      ..removeListener(_handleFabVisibilityChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -136,29 +144,34 @@ class _EquipmentScreenState extends State<EquipmentScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Site Pictures'),
-        backgroundColor: const Color(0xFF4A90E2),
-        bottom: _equipment != null
-            ? TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'All Photos'),
-                  Tab(text: 'Folders'),
-                ],
-              )
-            : null,
+    final fab = _fabVisibilityController.isVisible ? _buildFAB() : null;
+
+    return FabVisibilityScope(
+      controller: _fabVisibilityController,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Site Pictures'),
+          backgroundColor: const Color(0xFF4A90E2),
+          bottom: _equipment != null
+              ? TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'All Photos'),
+                    Tab(text: 'Folders'),
+                  ],
+                )
+              : null,
+        ),
+        body: Column(
+          children: [
+            if (_equipment != null) _buildBreadcrumb(),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+        bottomNavigationBar: const BottomNav(currentIndex: -1),
+        floatingActionButton: fab,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
-      body: Column(
-        children: [
-          if (_equipment != null) _buildBreadcrumb(),
-          Expanded(child: _buildBody()),
-        ],
-      ),
-      bottomNavigationBar: const BottomNav(currentIndex: -1),
-      floatingActionButton: _buildFAB(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -331,6 +344,21 @@ class _EquipmentScreenState extends State<EquipmentScreen>
     }
 
     return null;
+  }
+
+  void _handleFabVisibilityChanged() {
+    if (!mounted) return;
+
+    // Avoid setState during build; schedule if we're mid-frame.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      setState(() {});
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
   }
 
   void _openQuickCapture() async {

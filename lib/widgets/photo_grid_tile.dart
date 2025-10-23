@@ -14,6 +14,8 @@ class PhotoGridTile extends StatelessWidget {
     this.onLongPress,
     this.showMetadata = false,
     this.cornerRadius = 0,
+    this.isSelected = false,
+    this.showSelectionState = false,
   });
 
   final Photo photo;
@@ -21,6 +23,8 @@ class PhotoGridTile extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool showMetadata;
   final double cornerRadius;
+  final bool isSelected;
+  final bool showSelectionState;
 
   static final DateFormat _timestampFormat = DateFormat('MMM d, yyyy • h:mm a');
 
@@ -68,6 +72,32 @@ class PhotoGridTile extends StatelessWidget {
                   ),
                 ),
                 child: metadata,
+              ),
+            ),
+          if (showSelectionState)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white.withValues(alpha: 0.85),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected
+                        ? Colors.white
+                        : Colors.grey.withOpacity(0.9),
+                    width: 2,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: isSelected
+                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                    : null,
               ),
             ),
         ],
