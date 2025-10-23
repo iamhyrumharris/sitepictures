@@ -86,6 +86,77 @@ class NeedsAssignedMoveService {
     });
   }
 
+  /// Reassign arbitrary photos to a new equipment (and optional folder).
+  ///
+  /// Used by global All Photos selection flow where photos may originate from
+  /// different equipments or folders. Clears any existing folder associations
+  /// before moving and optionally attaches to the provided folder/category.
+  Future<NeedsAssignedMoveSummary> reassignPhotos({
+    required List<String> photoIds,
+    required String targetEquipmentId,
+    String? targetFolderId,
+    BeforeAfter? targetCategory,
+  }) async {
+    if (photoIds.isEmpty) {
+      return NeedsAssignedMoveSummary.empty();
+    }
+
+    if ((targetFolderId == null) != (targetCategory == null)) {
+      throw ArgumentError(
+        'targetFolderId and targetCategory must either both be null or both be provided.',
+      );
+    }
+
+    final db = await _dbService.database;
+
+    return await db.transaction((txn) async {
+      final placeholders = List.filled(photoIds.length, '?').join(',');
+      final rows = await txn.query(
+        'photos',
+        columns: ['id'],
+        where: 'id IN ($placeholders)',
+        whereArgs: photoIds,
+      );
+
+      if (rows.length != photoIds.length) {
+        throw Exception(
+          'Some selected photos were not found. They may have been deleted.',
+        );
+      }
+
+      final folderRows = await txn.query(
+        'folder_photos',
+        columns: ['folder_id'],
+        where: 'photo_id IN ($placeholders)',
+        whereArgs: photoIds,
+      );
+
+      final impactedFolderIds = folderRows
+          .map((row) => row['folder_id'])
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      await _clearExistingFolderAssociations(txn, photoIds);
+      await _updatePhotoEquipment(txn, photoIds, targetEquipmentId);
+
+      if (targetFolderId != null && targetCategory != null) {
+        await _validateTargetFolder(txn, targetFolderId, targetEquipmentId);
+        await _associatePhotosToFolder(
+          txn,
+          photoIds,
+          targetFolderId,
+          targetCategory,
+        );
+      }
+
+      return NeedsAssignedMoveSummary(
+        movedPhotoIds: photoIds,
+        impactedFolderIds: impactedFolderIds,
+      );
+    });
+  }
+
   Future<NeedsAssignedMoveSummary> moveFoldersToEquipment({
     required List<String> folderIds,
     required String sourceEquipmentId,
