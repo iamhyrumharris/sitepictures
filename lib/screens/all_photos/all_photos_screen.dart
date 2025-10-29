@@ -4,7 +4,13 @@ import 'package:provider/provider.dart';
 
 import '../../models/photo.dart';
 import '../../providers/all_photos_provider.dart';
+import '../../providers/import_flow_provider.dart';
+import '../../providers/needs_assigned_provider.dart';
 import '../../widgets/photo_grid_tile.dart';
+import '../../models/import_batch.dart';
+import '../../router.dart';
+import '../../widgets/import_progress_sheet.dart';
+import '../../widgets/import_destination_picker.dart';
 
 class AllPhotosScreen extends StatefulWidget {
   const AllPhotosScreen({super.key});
@@ -16,6 +22,56 @@ class AllPhotosScreen extends StatefulWidget {
 class _AllPhotosScreenState extends State<AllPhotosScreen>
     with AutomaticKeepAliveClientMixin {
   late final ScrollController _scrollController;
+
+  Future<void> _handleImport(BuildContext context) async {
+    final importFlow = context.read<ImportFlowProvider>();
+    final selection = await showImportDestinationPicker(
+      context: context,
+      entryPoint: ImportEntryPoint.allPhotos,
+    );
+
+    if (selection == null) {
+      return;
+    }
+
+    importFlow.configure(
+      entryPoint: ImportEntryPoint.allPhotos,
+      defaultDestination: selection.destination,
+      beforeAfterChoice: selection.beforeAfterChoice,
+      navigatorKey: AppRouter.router.routerDelegate.navigatorKey,
+      initialPermissionState: importFlow.permissionState,
+    );
+
+    final result = await showImportProgressSheet(
+      context,
+      provider: importFlow,
+      onStart: () => importFlow.startImport(pickerContext: context),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result != null) {
+      try {
+        await context.read<NeedsAssignedProvider>().loadGlobalNeedsAssigned();
+      } catch (_) {}
+      try {
+        await context.read<AllPhotosProvider>().refresh();
+      } catch (_) {}
+
+      final batch = result.batch;
+      final summary =
+          '${batch.importedCount} imported, ${batch.duplicateCount} duplicate(s) skipped, ${batch.failedCount} failed';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(summary)));
+    } else if (importFlow.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(importFlow.errorMessage!)));
+    }
+  }
 
   @override
   void initState() {
@@ -65,6 +121,11 @@ class _AllPhotosScreenState extends State<AllPhotosScreen>
       appBar: AppBar(
         title: const Text('All Photos'),
         actions: [
+          IconButton(
+            tooltip: 'Import Photos',
+            icon: const Icon(Icons.file_upload_outlined),
+            onPressed: () => _handleImport(context),
+          ),
           Consumer<AllPhotosProvider>(
             builder: (context, provider, _) {
               final isBusy = provider.isLoading || provider.isRefreshing;
@@ -115,11 +176,11 @@ class _AllPhotosScreenState extends State<AllPhotosScreen>
                     SliverGrid(
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 0,
-                        crossAxisSpacing: 0,
-                        childAspectRatio: 1,
-                      ),
+                            crossAxisCount: 3,
+                            mainAxisSpacing: 0,
+                            crossAxisSpacing: 0,
+                            childAspectRatio: 1,
+                          ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final photo = provider.photos[index];
                         return PhotoGridTile(
@@ -140,11 +201,11 @@ class _AllPhotosScreenState extends State<AllPhotosScreen>
                                   child: CircularProgressIndicator(),
                                 )
                               : (provider.hasMore
-                                  ? const SizedBox.shrink()
-                                  : const Text(
-                                      'Showing latest photos',
-                                      style: TextStyle(color: Colors.grey),
-                                    )),
+                                    ? const SizedBox.shrink()
+                                    : const Text(
+                                        'Showing latest photos',
+                                        style: TextStyle(color: Colors.grey),
+                                      )),
                         ),
                       ),
                     ),

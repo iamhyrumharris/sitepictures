@@ -14,10 +14,10 @@ class AllPhotosTab extends StatefulWidget {
   const AllPhotosTab({super.key, required this.equipmentId});
 
   @override
-  State<AllPhotosTab> createState() => _AllPhotosTabState();
+  State<AllPhotosTab> createState() => AllPhotosTabState();
 }
 
-class _AllPhotosTabState extends State<AllPhotosTab>
+class AllPhotosTabState extends State<AllPhotosTab>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
@@ -49,6 +49,8 @@ class _AllPhotosTabState extends State<AllPhotosTab>
     }
   }
 
+  Future<void> reload() => _loadPhotos();
+
   Future<void> _refreshPhotos() async {
     await _loadPhotos();
   }
@@ -76,14 +78,17 @@ class _AllPhotosTabState extends State<AllPhotosTab>
 
         // Delete photo files from storage
         try {
-          final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+          final photoFile = PhotoStorageService.tryResolveLocalFile(
+            photo.filePath,
+          );
           if (photoFile != null && await photoFile.exists()) {
             await photoFile.delete();
           }
 
           if (photo.thumbnailPath != null) {
-            final thumbnailFile =
-                PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
+            final thumbnailFile = PhotoStorageService.tryResolveLocalFile(
+              photo.thumbnailPath!,
+            );
             if (thumbnailFile != null && await thumbnailFile.exists()) {
               await thumbnailFile.delete();
             }

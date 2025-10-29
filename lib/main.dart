@@ -7,10 +7,14 @@ import 'providers/sync_state.dart';
 import 'providers/all_photos_provider.dart';
 import 'providers/folder_provider.dart';
 import 'providers/needs_assigned_provider.dart';
+import 'providers/import_flow_provider.dart';
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
 import 'services/background_sync_service.dart';
 import 'services/photo_storage_service.dart';
+import 'services/import_repository.dart';
+import 'services/import_service.dart';
+import 'services/analytics_logger.dart';
 import 'router.dart';
 
 void main() async {
@@ -29,11 +33,32 @@ void main() async {
   // Prime photo storage so file paths can be resolved synchronously.
   await PhotoStorageService.ensureInitialized();
 
-  runApp(const SitePicturesApp());
+  final importRepository = ImportRepository(databaseService: dbService);
+  final importService = ImportServiceImpl(
+    importRepository: importRepository,
+    databaseService: dbService,
+    navigatorKey: AppRouter.router.routerDelegate.navigatorKey,
+  );
+
+  final analyticsLogger = AnalyticsLogger();
+
+  runApp(
+    SitePicturesApp(
+      importService: importService,
+      analyticsLogger: analyticsLogger,
+    ),
+  );
 }
 
 class SitePicturesApp extends StatelessWidget {
-  const SitePicturesApp({super.key});
+  const SitePicturesApp({
+    super.key,
+    required this.importService,
+    required this.analyticsLogger,
+  });
+
+  final ImportService importService;
+  final AnalyticsLogger analyticsLogger;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +79,14 @@ class SitePicturesApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FolderProvider()),
         ChangeNotifierProvider(
           create: (_) => NeedsAssignedProvider()..loadGlobalNeedsAssigned(),
+        ),
+        Provider<AnalyticsLogger>.value(value: analyticsLogger),
+        ChangeNotifierProvider(
+          create: (_) => ImportFlowProvider(
+            importService: importService,
+            analyticsLogger: analyticsLogger,
+            navigatorKey: AppRouter.router.routerDelegate.navigatorKey,
+          ),
         ),
       ],
       child: MaterialApp.router(

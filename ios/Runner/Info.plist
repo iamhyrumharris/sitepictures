@@ -50,6 +50,8 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to tag photos with GPS coordinates.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs photo library access to save captured photos.</string>
+	<string>FieldPhoto Pro imports before and after equipment photos from your library. You can grant limited access and still choose the photos you want to share.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>FieldPhoto Pro only saves work documentation you explicitly export back to your photo library.</string>
 </dict>
 </plist>

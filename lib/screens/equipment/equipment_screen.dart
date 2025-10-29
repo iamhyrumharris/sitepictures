@@ -1,28 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/equipment.dart';
-import '../../models/user.dart';
+import 'package:provider/provider.dart';
+
 import '../../models/client.dart';
+import '../../models/equipment.dart';
 import '../../models/site.dart';
+import '../../models/user.dart';
 import '../../providers/app_state.dart';
 import '../../providers/auth_state.dart';
-import '../../providers/navigation_state.dart' as nav_state;
 import '../../providers/folder_provider.dart';
+import '../../providers/navigation_state.dart' as nav_state;
 import '../../widgets/breadcrumb_navigation.dart';
-import '../../widgets/create_folder_dialog.dart';
 import '../../widgets/bottom_nav.dart';
+import '../../widgets/create_folder_dialog.dart';
 import '../../services/recent_locations_service.dart';
 import 'all_photos_tab.dart';
 import 'folders_tab.dart';
 
-/// Equipment screen showing photos
-/// Implements FR-001, FR-002 (tab navigation), FR-007, FR-009
 class EquipmentScreen extends StatefulWidget {
-  final String equipmentId;
+  const EquipmentScreen({super.key, required this.equipmentId});
 
-  const EquipmentScreen({Key? key, required this.equipmentId})
-    : super(key: key);
+  final String equipmentId;
 
   @override
   State<EquipmentScreen> createState() => _EquipmentScreenState();
@@ -43,9 +41,6 @@ class _EquipmentScreenState extends State<EquipmentScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {}); // Rebuild to update FAB visibility
-    });
     _loadData();
   }
 
@@ -66,26 +61,21 @@ class _EquipmentScreenState extends State<EquipmentScreen>
       final authState = context.read<AuthState>();
       final equipment = await appState.getEquipment(widget.equipmentId);
 
-      // Load hierarchy based on equipment location
       Client? client;
       MainSite? mainSite;
       SubSite? subSite;
 
       if (equipment != null) {
         if (equipment.clientId != null) {
-          // Equipment belongs directly to a client
           client = await appState.getClient(equipment.clientId!);
         } else if (equipment.mainSiteId != null) {
-          // Equipment belongs to a main site
           mainSite = await appState.getMainSite(equipment.mainSiteId!);
           if (mainSite != null) {
             client = await appState.getClient(mainSite.clientId);
           }
         } else if (equipment.subSiteId != null) {
-          // Equipment belongs to a subsite
           subSite = await appState.getSubSite(equipment.subSiteId!);
           if (subSite != null) {
-            // SubSite can belong to client, mainSite, or parent subsite
             if (subSite.mainSiteId != null) {
               mainSite = await appState.getMainSite(subSite.mainSiteId!);
               if (mainSite != null) {
@@ -94,8 +84,6 @@ class _EquipmentScreenState extends State<EquipmentScreen>
             } else if (subSite.clientId != null) {
               client = await appState.getClient(subSite.clientId!);
             }
-            // Note: We're not traversing parent subsites for breadcrumbs
-            // as that would require recursive lookups
           }
         }
       }
@@ -108,7 +96,6 @@ class _EquipmentScreenState extends State<EquipmentScreen>
         _isLoading = false;
       });
 
-      // Track this location visit with actual names
       if (equipment != null && authState.currentUser != null) {
         final pathParts = <String>[];
         if (client != null) pathParts.add(client.name);
@@ -165,7 +152,6 @@ class _EquipmentScreenState extends State<EquipmentScreen>
   Widget _buildBreadcrumb() {
     final breadcrumbs = <nav_state.BreadcrumbItem>[];
 
-    // Build breadcrumb from actual hierarchy
     if (_client != null) {
       breadcrumbs.add(
         nav_state.BreadcrumbItem(
@@ -209,9 +195,8 @@ class _EquipmentScreenState extends State<EquipmentScreen>
     return BreadcrumbNavigation(
       breadcrumbs: breadcrumbs,
       onTap: (index) {
-        // Navigate back based on breadcrumb level
-        int popCount = breadcrumbs.length - 1 - index;
-        for (int i = 0; i < popCount; i++) {
+        final popCount = breadcrumbs.length - 1 - index;
+        for (var i = 0; i < popCount; i++) {
           Navigator.pop(context);
         }
       },
@@ -251,67 +236,13 @@ class _EquipmentScreenState extends State<EquipmentScreen>
     );
   }
 
-  Future<void> _createFolder() async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => const CreateFolderDialog(),
-    );
-
-    if (result != null && mounted) {
-      debugPrint('Creating folder with work order: $result');
-
-      final appState = context.read<AppState>();
-      final folderProvider = context.read<FolderProvider>();
-      final authState = context.read<AuthState>();
-
-      // Ensure AppState has the current user
-      if (authState.currentUser != null) {
-        appState.setCurrentUser(authState.currentUser);
-        debugPrint('Set current user in AppState: ${authState.currentUser!.email}');
-      } else {
-        debugPrint('ERROR: No current user in AuthState!');
-      }
-
-      final folder = await appState.createFolder(
-        equipmentId: widget.equipmentId,
-        workOrder: result,
-      );
-
-      debugPrint('Folder created: ${folder?.id} - ${folder?.name}');
-
-      if (folder != null) {
-        // Reload folders in the provider
-        await folderProvider.loadFolders(widget.equipmentId);
-
-        debugPrint('Folders reloaded: ${folderProvider.folders.length} folders');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Folder created: ${folder.name}')),
-          );
-        }
-      } else if (mounted) {
-        final error = appState.errorMessage ?? 'Unknown error';
-        debugPrint('Failed to create folder: $error');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create folder: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Widget? _buildFAB() {
     final authState = context.watch<AuthState>();
     if (authState.currentUser?.role == UserRole.viewer) {
       return null;
     }
 
-    // Show different FAB based on active tab
     if (_tabController.index == 0) {
-      // All Photos tab - show camera FAB
       return FloatingActionButton(
         heroTag: 'equipment_camera_fab_${widget.equipmentId}',
         onPressed: _openQuickCapture,
@@ -319,8 +250,9 @@ class _EquipmentScreenState extends State<EquipmentScreen>
         child: const Icon(Icons.camera_alt),
         tooltip: 'Quick Capture',
       );
-    } else if (_tabController.index == 1) {
-      // Folders tab - show create folder FAB
+    }
+
+    if (_tabController.index == 1) {
       return FloatingActionButton.extended(
         heroTag: 'create_folder_fab_${widget.equipmentId}',
         onPressed: _createFolder,
@@ -333,14 +265,55 @@ class _EquipmentScreenState extends State<EquipmentScreen>
     return null;
   }
 
-  void _openQuickCapture() async {
-    // T033: Launch camera with equipment all photos context
-    await context.push('/camera-capture', extra: {
-      'context': 'equipment-all-photos',
-      'equipmentId': widget.equipmentId,
-    });
+  Future<void> _createFolder() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => const CreateFolderDialog(),
+    );
 
-    // T037: Force rebuild to refresh All Photos list
+    if (result != null && mounted) {
+      final appState = context.read<AppState>();
+      final folderProvider = context.read<FolderProvider>();
+      final authState = context.read<AuthState>();
+
+      if (authState.currentUser != null) {
+        appState.setCurrentUser(authState.currentUser);
+      }
+
+      final folder = await appState.createFolder(
+        equipmentId: widget.equipmentId,
+        workOrder: result,
+      );
+
+      if (folder != null) {
+        await folderProvider.loadFolders(widget.equipmentId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Folder created: ${folder.name}')),
+          );
+        }
+      } else if (mounted) {
+        final error = appState.errorMessage ?? 'Unknown error';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create folder: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openQuickCapture() async {
+    await context.push(
+      '/camera-capture',
+      extra: {
+        'context': 'equipment-all-photos',
+        'equipmentId': widget.equipmentId,
+      },
+    );
+
     if (mounted) {
       setState(() {});
     }
