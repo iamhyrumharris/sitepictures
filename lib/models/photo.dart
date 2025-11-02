@@ -14,6 +14,10 @@ class Photo {
   final bool isSynced;
   final String? syncedAt;
   final String? remoteUrl;
+  final String? sourceAssetId;
+  final String? fingerprintSha1;
+  final String? importBatchId;
+  final String importSource;
   final DateTime createdAt;
 
   // Virtual fields (not stored in database, derived from JOIN queries)
@@ -39,6 +43,10 @@ class Photo {
     this.isSynced = false,
     this.syncedAt,
     this.remoteUrl,
+    this.sourceAssetId,
+    this.fingerprintSha1,
+    this.importBatchId,
+    this.importSource = 'camera',
     DateTime? createdAt,
     // Virtual fields
     this.folderId,
@@ -79,6 +87,10 @@ class Photo {
       'is_synced': isSynced ? 1 : 0,
       'synced_at': syncedAt,
       'remote_url': remoteUrl,
+      'source_asset_id': sourceAssetId,
+      'fingerprint_sha1': fingerprintSha1,
+      'import_batch_id': importBatchId,
+      'import_source': importSource,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -92,13 +104,16 @@ class Photo {
       thumbnailPath: map['thumbnail_path'],
       latitude: map['latitude'].toDouble(),
       longitude: map['longitude'].toDouble(),
-      timestamp:
-          _parseDate(map['timestamp']) ?? _parseDate(map['created_at'])!,
+      timestamp: _parseDate(map['timestamp']) ?? _parseDate(map['created_at'])!,
       capturedBy: map['captured_by'],
       fileSize: map['file_size'],
       isSynced: map['is_synced'] == 1,
       syncedAt: map['synced_at'],
       remoteUrl: map['remote_url'],
+      sourceAssetId: map['source_asset_id'],
+      fingerprintSha1: map['fingerprint_sha1'],
+      importBatchId: map['import_batch_id'],
+      importSource: map['import_source'] ?? 'camera',
       createdAt: _parseDate(map['created_at']) ?? DateTime.now(),
       // Virtual fields from JOIN queries
       folderId: map['folder_id'],
@@ -134,6 +149,10 @@ class Photo {
       isSynced: true,
       syncedAt: json['syncedAt'],
       remoteUrl: json['remoteUrl'],
+      sourceAssetId: json['sourceAssetId'],
+      fingerprintSha1: json['fingerprintSha1'],
+      importBatchId: json['importBatchId'],
+      importSource: json['importSource'] ?? 'camera',
       createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
       equipmentName: json['equipmentName'],
       clientName: json['clientName'],
@@ -154,6 +173,10 @@ class Photo {
       'capturedBy': capturedBy,
       'fileSize': fileSize,
       'remoteUrl': remoteUrl,
+      'sourceAssetId': sourceAssetId,
+      'fingerprintSha1': fingerprintSha1,
+      'importBatchId': importBatchId,
+      'importSource': importSource,
       'equipmentName': equipmentName,
       'clientName': clientName,
       'mainSiteName': mainSiteName,
@@ -168,6 +191,10 @@ class Photo {
     bool? isSynced,
     String? syncedAt,
     String? remoteUrl,
+    String? sourceAssetId,
+    String? fingerprintSha1,
+    String? importBatchId,
+    String? importSource,
     String? folderId,
     String? folderName,
     BeforeAfter? beforeAfter,
@@ -190,6 +217,10 @@ class Photo {
       isSynced: isSynced ?? this.isSynced,
       syncedAt: syncedAt ?? this.syncedAt,
       remoteUrl: remoteUrl ?? this.remoteUrl,
+      sourceAssetId: sourceAssetId ?? this.sourceAssetId,
+      fingerprintSha1: fingerprintSha1 ?? this.fingerprintSha1,
+      importBatchId: importBatchId ?? this.importBatchId,
+      importSource: importSource ?? this.importSource,
       // Virtual fields
       folderId: folderId ?? this.folderId,
       folderName: folderName ?? this.folderName,

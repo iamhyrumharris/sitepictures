@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -126,6 +126,33 @@ class DatabaseService {
       )
     ''');
 
+    // Import batches table
+    await db.execute('''
+      CREATE TABLE import_batches (
+        id TEXT PRIMARY KEY,
+        entry_point TEXT NOT NULL,
+        equipment_id TEXT,
+        folder_id TEXT,
+        destination_category TEXT NOT NULL,
+        selected_count INTEGER NOT NULL,
+        imported_count INTEGER NOT NULL DEFAULT 0,
+        duplicate_count INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        permission_state TEXT NOT NULL,
+        device_free_space_bytes INTEGER,
+        FOREIGN KEY (equipment_id) REFERENCES equipment (id)
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_import_batches_started_at ON import_batches(started_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_import_batches_equipment ON import_batches(equipment_id)',
+    );
+
     // Photos table
     await db.execute('''
       CREATE TABLE photos (
@@ -141,11 +168,45 @@ class DatabaseService {
         is_synced INTEGER NOT NULL DEFAULT 0,
         synced_at TEXT,
         remote_url TEXT,
+        source_asset_id TEXT,
+        fingerprint_sha1 TEXT,
+        import_batch_id TEXT,
+        import_source TEXT NOT NULL DEFAULT 'camera',
         created_at TEXT NOT NULL,
         FOREIGN KEY (equipment_id) REFERENCES equipment (id),
-        FOREIGN KEY (captured_by) REFERENCES users (id)
+        FOREIGN KEY (captured_by) REFERENCES users (id),
+        FOREIGN KEY (import_batch_id) REFERENCES import_batches (id)
       )
     ''');
+
+    await db.execute(
+      'CREATE INDEX idx_photos_source_asset ON photos(source_asset_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photos_fingerprint ON photos(fingerprint_sha1)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_photos_import_batch ON photos(import_batch_id)',
+    );
+
+    // Duplicate registry table
+    await db.execute('''
+      CREATE TABLE duplicate_registry (
+        id TEXT PRIMARY KEY,
+        photo_id TEXT NOT NULL,
+        source_asset_id TEXT,
+        fingerprint_sha1 TEXT,
+        imported_at TEXT NOT NULL,
+        FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_duplicate_registry_asset ON duplicate_registry(source_asset_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_duplicate_registry_fingerprint ON duplicate_registry(fingerprint_sha1)',
+    );
 
     // Recent locations table
     await db.execute('''
@@ -306,6 +367,10 @@ class DatabaseService {
     if (oldVersion < 6) {
       await _migration006(db);
     }
+    // Migration 007: Gallery import schema support
+    if (oldVersion < 7) {
+      await _migration007(db);
+    }
   }
 
   Future<void> _migration002(Database db) async {
@@ -356,6 +421,66 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX idx_folder_photos_photo ON folder_photos(photo_id)',
+    );
+  }
+
+  Future<void> _migration007(Database db) async {
+    await db.execute('ALTER TABLE photos ADD COLUMN source_asset_id TEXT');
+    await db.execute('ALTER TABLE photos ADD COLUMN fingerprint_sha1 TEXT');
+    await db.execute('ALTER TABLE photos ADD COLUMN import_batch_id TEXT');
+    await db.execute(
+      "ALTER TABLE photos ADD COLUMN import_source TEXT NOT NULL DEFAULT 'camera'",
+    );
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS import_batches (
+        id TEXT PRIMARY KEY,
+        entry_point TEXT NOT NULL,
+        equipment_id TEXT,
+        folder_id TEXT,
+        destination_category TEXT NOT NULL,
+        selected_count INTEGER NOT NULL,
+        imported_count INTEGER NOT NULL DEFAULT 0,
+        duplicate_count INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        permission_state TEXT NOT NULL,
+        device_free_space_bytes INTEGER,
+        FOREIGN KEY (equipment_id) REFERENCES equipment (id)
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_import_batches_started_at ON import_batches(started_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_import_batches_equipment ON import_batches(equipment_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photos_source_asset ON photos(source_asset_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photos_fingerprint ON photos(fingerprint_sha1)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_photos_import_batch ON photos(import_batch_id)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duplicate_registry (
+        id TEXT PRIMARY KEY,
+        photo_id TEXT NOT NULL,
+        source_asset_id TEXT,
+        fingerprint_sha1 TEXT,
+        imported_at TEXT NOT NULL,
+        FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_duplicate_registry_asset ON duplicate_registry(source_asset_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_duplicate_registry_fingerprint ON duplicate_registry(fingerprint_sha1)',
     );
   }
 
@@ -685,8 +810,9 @@ class DatabaseService {
   }) async {
     final db = await database;
     const timestampExpr = 'datetime(COALESCE(p.timestamp, p.created_at))';
-    final beforeClause =
-        before != null ? 'AND $timestampExpr < datetime(?)' : '';
+    final beforeClause = before != null
+        ? 'AND $timestampExpr < datetime(?)'
+        : '';
     final args = <Object?>[];
     if (before != null) {
       args.add(before.toIso8601String());
@@ -730,5 +856,53 @@ class DatabaseService {
     ''';
 
     return await db.rawQuery(query, args);
+  }
+
+  /// Get all photos categorized as "Before" for a specific equipment across folders.
+  Future<List<Map<String, dynamic>>> getEquipmentBeforePhotos(
+    String equipmentId,
+  ) async {
+    final db = await database;
+    return await db.rawQuery(
+      '''
+      SELECT
+        p.*,
+        fp.folder_id AS folder_id,
+        pf.name AS folder_name,
+        fp.before_after AS before_after
+      FROM photos p
+      JOIN folder_photos fp ON fp.photo_id = p.id
+      JOIN photo_folders pf ON pf.id = fp.folder_id
+      WHERE p.equipment_id = ?
+        AND pf.is_deleted = 0
+        AND fp.before_after = 'before'
+      ORDER BY datetime(COALESCE(p.timestamp, p.created_at)) DESC
+    ''',
+      [equipmentId],
+    );
+  }
+
+  /// Get all photos categorized as "After" for a specific equipment across folders.
+  Future<List<Map<String, dynamic>>> getEquipmentAfterPhotos(
+    String equipmentId,
+  ) async {
+    final db = await database;
+    return await db.rawQuery(
+      '''
+      SELECT
+        p.*,
+        fp.folder_id AS folder_id,
+        pf.name AS folder_name,
+        fp.before_after AS before_after
+      FROM photos p
+      JOIN folder_photos fp ON fp.photo_id = p.id
+      JOIN photo_folders pf ON pf.id = fp.folder_id
+      WHERE p.equipment_id = ?
+        AND pf.is_deleted = 0
+        AND fp.before_after = 'after'
+      ORDER BY datetime(COALESCE(p.timestamp, p.created_at)) DESC
+    ''',
+      [equipmentId],
+    );
   }
 }

@@ -1,23 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/photo.dart';
+import 'package:provider/provider.dart';
+
+import '../../models/client.dart';
+import '../../models/destination_context.dart';
+import '../../models/equipment.dart';
+import '../../models/import_batch.dart';
 import '../../models/folder_photo.dart';
+import '../../models/photo.dart';
+import '../../models/site.dart';
+import '../../providers/app_state.dart';
 import '../../providers/folder_provider.dart';
-import '../../widgets/photo_delete_dialog.dart';
-import '../../widgets/bottom_nav.dart';
+import '../../providers/import_flow_provider.dart';
+import '../../providers/needs_assigned_provider.dart';
 import '../../services/database_service.dart';
+import '../../services/import_service.dart';
 import '../../services/photo_storage_service.dart';
+import '../../widgets/bottom_nav.dart';
+import '../../widgets/import_progress_sheet.dart';
+import '../../widgets/photo_delete_dialog.dart';
+import '../../router.dart';
 
 class FolderDetailScreen extends StatefulWidget {
-  final String equipmentId;
-  final String folderId;
-
   const FolderDetailScreen({
     super.key,
     required this.equipmentId,
     required this.folderId,
   });
+
+  final String equipmentId;
+  final String folderId;
 
   @override
   State<FolderDetailScreen> createState() => _FolderDetailScreenState();
@@ -27,10 +39,14 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _activeTabIndex = 0;
-  List<Photo> _beforePhotos = [];
-  List<Photo> _afterPhotos = [];
+  List<Photo> _beforePhotos = <Photo>[];
+  List<Photo> _afterPhotos = <Photo>[];
   bool _isLoading = true;
   String _folderName = '';
+  Equipment? _equipment;
+  Client? _client;
+  MainSite? _mainSite;
+  SubSite? _subSite;
 
   @override
   void initState() {
@@ -38,9 +54,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
     _tabController = TabController(length: 2, vsync: this);
     _activeTabIndex = _tabController.index;
     _tabController.addListener(_handleTabChange);
-    // Defer loading until after the first frame to avoid calling setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadPhotos();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadContext();
+      await _loadPhotos();
     });
   }
 
@@ -53,16 +69,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
 
   void _handleTabChange() {
     if (_tabController.indexIsChanging) {
-      // Ignore intermediate values while the controller animates between tabs.
       return;
     }
-
-    // Track the active tab so camera saves to the matching before/after category.
     final newIndex = _tabController.index;
     if (newIndex != _activeTabIndex) {
-      setState(() {
-        _activeTabIndex = newIndex;
-      });
+      setState(() => _activeTabIndex = newIndex);
     }
   }
 
@@ -71,44 +82,82 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
     setState(() => _isLoading = true);
 
     final folderProvider = context.read<FolderProvider>();
-
-    // Load before and after photos
     final beforePhotos = await folderProvider.getBeforePhotos(widget.folderId);
     final afterPhotos = await folderProvider.getAfterPhotos(widget.folderId);
 
-    if (mounted) {
-      setState(() {
-        _beforePhotos = beforePhotos;
-        _afterPhotos = afterPhotos;
-        _isLoading = false;
-      });
+    if (!mounted) return;
+    setState(() {
+      _beforePhotos = beforePhotos;
+      _afterPhotos = afterPhotos;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _loadContext() async {
+    final appState = context.read<AppState>();
+    final equipment = await appState.getEquipment(widget.equipmentId);
+
+    Client? client;
+    MainSite? mainSite;
+    SubSite? subSite;
+
+    if (equipment != null) {
+      if (equipment.clientId != null) {
+        client = await appState.getClient(equipment.clientId!);
+      } else if (equipment.mainSiteId != null) {
+        mainSite = await appState.getMainSite(equipment.mainSiteId!);
+        if (mainSite != null) {
+          client = await appState.getClient(mainSite.clientId);
+        }
+      } else if (equipment.subSiteId != null) {
+        subSite = await appState.getSubSite(equipment.subSiteId!);
+        if (subSite != null) {
+          if (subSite.mainSiteId != null) {
+            mainSite = await appState.getMainSite(subSite.mainSiteId!);
+            if (mainSite != null) {
+              client = await appState.getClient(mainSite.clientId);
+            }
+          } else if (subSite.clientId != null) {
+            client = await appState.getClient(subSite.clientId!);
+          }
+        }
+      }
     }
+
+    final folderMap = await DatabaseService().getFolderById(widget.folderId);
+
+    if (!mounted) return;
+    setState(() {
+      _equipment = equipment;
+      _client = client;
+      _mainSite = mainSite;
+      _subSite = subSite;
+      if (folderMap != null && folderMap['name'] is String) {
+        _folderName = folderMap['name'] as String;
+      }
+    });
   }
 
   void _capturePhotos() async {
-    final currentTab = _activeTabIndex;
-    final beforeAfter = currentTab == 0
+    final beforeAfter = _activeTabIndex == 0
         ? BeforeAfter.before
         : BeforeAfter.after;
+    final contextStr = _activeTabIndex == 0
+        ? 'equipment-before'
+        : 'equipment-after';
 
-    // T040-T041: Navigate to camera with before/after context
-    final contextStr = currentTab == 0 ? 'equipment-before' : 'equipment-after';
-    final result = await context.push(
+    await context.push(
       '/camera-capture',
       extra: {
         'context': contextStr,
         'folderId': widget.folderId,
-        'equipmentId': widget.equipmentId, // Add equipmentId for fallback save
+        'equipmentId': widget.equipmentId,
         'beforeAfter': beforeAfter.name,
       },
     );
 
-    // T045: Refresh Before/After photo lists to show newly saved photos
     if (mounted) {
       await _loadPhotos();
-
-      // T047: Update folder photo count in Folders tab list
-      // (This would be handled by FolderProvider reloading folder metadata)
     }
   }
 
@@ -125,54 +174,115 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
       ),
     );
 
-    if (confirmed) {
-      try {
-        final dbService = DatabaseService();
-        final db = await dbService.database;
+    if (!confirmed) {
+      return;
+    }
 
-        // Delete photo record from database (CASCADE will remove folder_photos entry)
-        await db.delete('photos', where: 'id = ?', whereArgs: [photo.id]);
+    try {
+      final dbService = DatabaseService();
+      final db = await dbService.database;
+      await db.delete('photos', where: 'id = ?', whereArgs: [photo.id]);
 
-        // Delete photo files from storage
-        try {
-          final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
-          if (photoFile != null && await photoFile.exists()) {
-            await photoFile.delete();
-          }
+      final photoFile = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+      if (photoFile != null && await photoFile.exists()) {
+        await photoFile.delete();
+      }
 
-          if (photo.thumbnailPath != null) {
-            final thumbnailFile =
-                PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
-            if (thumbnailFile != null && await thumbnailFile.exists()) {
-              await thumbnailFile.delete();
-            }
-          }
-        } catch (e) {
-          debugPrint('Error deleting photo files: $e');
-        }
-
-        // Refresh the photos list
-        await _loadPhotos();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo deleted'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting photo: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      if (photo.thumbnailPath != null) {
+        final thumbFile = PhotoStorageService.tryResolveLocalFile(
+          photo.thumbnailPath!,
+        );
+        if (thumbFile != null && await thumbFile.exists()) {
+          await thumbFile.delete();
         }
       }
+
+      await _loadPhotos();
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Photo deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Future<void> _handleImport() async {
+    if (_equipment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Equipment context unavailable.')),
+      );
+      return;
+    }
+
+    final choice = _activeTabIndex == 0
+        ? BeforeAfterChoice.before
+        : BeforeAfterChoice.after;
+    final entryPoint = choice == BeforeAfterChoice.before
+        ? ImportEntryPoint.equipmentBefore
+        : ImportEntryPoint.equipmentAfter;
+
+    final importFlow = context.read<ImportFlowProvider>();
+    importFlow.configure(
+      entryPoint: entryPoint,
+      defaultDestination: _buildDestination(choice),
+      beforeAfterChoice: choice,
+      navigatorKey: AppRouter.router.routerDelegate.navigatorKey,
+      initialPermissionState: importFlow.permissionState,
+    );
+
+    final result = await showImportProgressSheet(
+      context,
+      provider: importFlow,
+      onStart: () => importFlow.startImport(pickerContext: context),
+    );
+
+    if (!mounted) return;
+
+    if (result != null) {
+      await _loadPhotos();
+      final batch = result.batch;
+      final summary =
+          '${batch.importedCount} imported, ${batch.duplicateCount} duplicate(s) skipped, ${batch.failedCount} failed';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(summary)));
+    } else if (importFlow.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(importFlow.errorMessage!)));
+    }
+  }
+
+  DestinationContext _buildDestination(BeforeAfterChoice choice) {
+    final equipment = _equipment!;
+    final type = choice == BeforeAfterChoice.before
+        ? DestinationType.equipmentBefore
+        : DestinationType.equipmentAfter;
+
+    final clientId =
+        _client?.id ??
+        equipment.clientId ??
+        NeedsAssignedProvider.globalClientId;
+
+    return DestinationContext(
+      type: type,
+      clientId: clientId,
+      mainSiteId: _mainSite?.id ?? equipment.mainSiteId,
+      subSiteId: _subSite?.id ?? equipment.subSiteId,
+      equipmentId: equipment.id,
+      folderId: widget.folderId,
+      label: equipment.name,
+    );
   }
 
   @override
@@ -180,13 +290,20 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(_folderName.isEmpty ? 'Folder' : _folderName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined),
+            tooltip: _activeTabIndex == 0
+                ? 'Import to Before'
+                : 'Import to After',
+            onPressed: _equipment == null ? null : _handleImport,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           onTap: (index) {
             if (_activeTabIndex != index) {
-              setState(() {
-                _activeTabIndex = index;
-              });
+              setState(() => _activeTabIndex = index);
             }
           },
           tabs: [
@@ -228,15 +345,15 @@ class _FolderDetailScreenState extends State<FolderDetailScreen>
 }
 
 class _BeforeAfterPhotoTab extends StatefulWidget {
-  final List<Photo> photos;
-  final String label;
-  final Function(Photo) onDeletePhoto;
-
   const _BeforeAfterPhotoTab({
     required this.photos,
     required this.label,
     required this.onDeletePhoto,
   });
+
+  final List<Photo> photos;
+  final String label;
+  final void Function(Photo) onDeletePhoto;
 
   @override
   State<_BeforeAfterPhotoTab> createState() => _BeforeAfterPhotoTabState();
@@ -249,7 +366,7 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     if (widget.photos.isEmpty) {
       return Center(
@@ -267,10 +384,7 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Tap camera to capture',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
+            const Text('Tap camera to capture'),
           ],
         ),
       );
@@ -297,15 +411,12 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
 
     return GestureDetector(
       onTap: () {
-        // Navigate to photo viewer with photos from current tab
-        context.push('/photo-viewer', extra: {
-          'photos': widget.photos,
-          'initialIndex': photoIndex,
-        });
+        context.push(
+          '/photo-viewer',
+          extra: {'photos': widget.photos, 'initialIndex': photoIndex},
+        );
       },
-      onLongPress: () {
-        _showPhotoContextMenu(photo);
-      },
+      onLongPress: () => _showPhotoContextMenu(photo),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.grey[300],
@@ -320,18 +431,15 @@ class _BeforeAfterPhotoTabState extends State<_BeforeAfterPhotoTab>
   }
 
   Widget _buildPhotoImage(Photo photo) {
-    // Try thumbnail first, then fall back to full photo
     final imagePath = photo.thumbnailPath ?? photo.filePath;
-
     final localFile = PhotoStorageService.tryResolveLocalFile(imagePath);
 
     if (localFile != null) {
       return Image.file(
         localFile,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.image, size: 40, color: Colors.grey);
-        },
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.image, size: 40, color: Colors.grey),
       );
     }
 

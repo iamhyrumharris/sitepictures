@@ -370,6 +370,10 @@ class _EquipmentScreenState extends State<EquipmentScreen>
 
     // T037: Force rebuild to refresh All Photos list
     if (mounted) {
+      final state = _allPhotosKey.currentState;
+      if (state is AllPhotosTabState) {
+        await state.reload();
+      }
       setState(() {});
     }
   }
