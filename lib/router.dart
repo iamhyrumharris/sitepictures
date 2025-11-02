@@ -20,8 +20,13 @@ import 'screens/photo_viewer_screen.dart';
 import 'screens/all_photos/all_photos_screen.dart';
 import 'services/auth_service.dart';
 import 'providers/needs_assigned_provider.dart';
+import 'providers/import_flow_provider.dart';
+import 'providers/all_photos_provider.dart';
 import 'models/camera_context.dart';
 import 'models/photo.dart';
+import 'models/import_batch.dart';
+import 'widgets/import_destination_picker.dart';
+import 'widgets/import_progress_sheet.dart';
 
 class AppRouter {
   static final AuthService _authService = AuthService();
@@ -265,6 +270,60 @@ class _HomeScreenContent extends StatefulWidget {
 }
 
 class _HomeScreenContentState extends State<_HomeScreenContent> {
+  Future<void> _handleImport(BuildContext context) async {
+    final importFlow = context.read<ImportFlowProvider>();
+    final selection = await showImportDestinationPicker(
+      context: context,
+      entryPoint: ImportEntryPoint.home,
+    );
+
+    if (selection == null) {
+      return;
+    }
+
+    importFlow.configure(
+      entryPoint: ImportEntryPoint.home,
+      defaultDestination: selection.destination,
+      beforeAfterChoice: selection.beforeAfterChoice,
+      navigatorKey: AppRouter.router.routerDelegate.navigatorKey,
+      initialPermissionState: importFlow.permissionState,
+    );
+
+    final result = await showImportProgressSheet(
+      context,
+      provider: importFlow,
+      onStart: () => importFlow.startImport(pickerContext: context),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result != null) {
+      try {
+        await context.read<NeedsAssignedProvider>().loadGlobalNeedsAssigned();
+      } catch (_) {
+        // ignore load failures for now
+      }
+      try {
+        await context.read<AllPhotosProvider>().refresh();
+      } catch (_) {
+        // ignore refresh failures
+      }
+
+      final batch = result.batch;
+      final summary =
+          '${batch.importedCount} imported, ${batch.duplicateCount} duplicate(s) skipped, ${batch.failedCount} failed';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(summary)));
+    } else if (importFlow.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(importFlow.errorMessage!)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final needsAssignedProvider = context.watch<NeedsAssignedProvider>();
@@ -279,6 +338,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         title: const Text('Ziatech'),
         backgroundColor: const Color(0xFF4A90E2),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined),
+            tooltip: 'Import Photos',
+            onPressed: () => _handleImport(context),
+          ),
           // T017: Needs Assigned button with badge indicator
           Badge(
             label: const Text('!'),

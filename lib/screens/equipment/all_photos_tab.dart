@@ -16,6 +16,7 @@ import '../../services/needs_assigned_move_service.dart';
 import '../../services/photo_storage_service.dart';
 import '../../widgets/create_folder_dialog.dart';
 import '../../widgets/fab_visibility_scope.dart';
+import '../../widgets/photo_delete_dialog.dart';
 import '../../widgets/photo_grid_tile.dart';
 
 class AllPhotosTab extends StatefulWidget {
@@ -24,10 +25,10 @@ class AllPhotosTab extends StatefulWidget {
   final String equipmentId;
 
   @override
-  State<AllPhotosTab> createState() => _AllPhotosTabState();
+  State<AllPhotosTab> createState() => AllPhotosTabState();
 }
 
-class _AllPhotosTabState extends State<AllPhotosTab>
+class AllPhotosTabState extends State<AllPhotosTab>
     with AutomaticKeepAliveClientMixin {
   final Set<String> _selectedPhotoIds = <String>{};
   List<Photo> _photos = <Photo>[];
@@ -95,7 +96,85 @@ class _AllPhotosTabState extends State<AllPhotosTab>
     });
   }
 
+  Future<void> reload() => _loadPhotos();
+
   Future<void> _refreshPhotos() => _loadPhotos();
+
+  Future<void> _deletePhoto(Photo photo) async {
+    if (_isPerformingAction) {
+      return;
+    }
+
+    var confirmed = false;
+    await showDialog(
+      context: context,
+      builder: (context) => PhotoDeleteDialog(
+        photoId: photo.id,
+        onConfirm: () => confirmed = true,
+      ),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setState(() {
+      _isPerformingAction = true;
+    });
+
+    final dbService = DatabaseService();
+    try {
+      final db = await dbService.database;
+      await db.delete('photos', where: 'id = ?', whereArgs: [photo.id]);
+
+      try {
+        final photoFile =
+            PhotoStorageService.tryResolveLocalFile(photo.filePath);
+        if (await photoFile?.exists() == true) {
+          await photoFile!.delete();
+        }
+
+        if (photo.thumbnailPath != null) {
+          final thumbFile =
+              PhotoStorageService.tryResolveLocalFile(photo.thumbnailPath!);
+          if (await thumbFile?.exists() == true) {
+            await thumbFile!.delete();
+          }
+        }
+      } catch (e) {
+        debugPrint('Error deleting photo files: $e');
+      }
+
+      if (_isSelectionMode) {
+        _exitSelectionMode();
+      }
+      await _loadPhotos();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo deleted'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPerformingAction = false;
+        });
+      }
+    }
+  }
 
   void _enterSelectionMode({String? initialPhotoId}) {
     if (_isSelectionMode && initialPhotoId == null) {
@@ -160,12 +239,41 @@ class _AllPhotosTabState extends State<AllPhotosTab>
     );
   }
 
+  void _showPhotoContextMenu(Photo photo) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.check_circle_outline),
+              title: const Text('Select Photos'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _enterSelectionMode(initialPhotoId: photo.id);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete Photo'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _deletePhoto(photo);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handlePhotoLongPress(Photo photo) {
     if (_isSelectionMode) {
       _togglePhotoSelection(photo.id);
       return;
     }
-    _enterSelectionMode(initialPhotoId: photo.id);
+    _showPhotoContextMenu(photo);
   }
 
   Future<void> _handleMoveSelected() async {

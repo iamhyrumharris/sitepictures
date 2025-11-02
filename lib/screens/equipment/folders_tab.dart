@@ -130,19 +130,16 @@ class _FoldersTabState extends State<FoldersTab>
     }
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Folder renamed')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Folder renamed')));
       return;
     }
 
     final error = folderProvider.errorMessage;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -171,9 +168,7 @@ class _FoldersTabState extends State<FoldersTab>
 
     if (equipment.id == widget.equipmentId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Folder is already on this equipment.'),
-        ),
+        const SnackBar(content: Text('Folder is already on this equipment.')),
       );
       return;
     }
@@ -191,9 +186,8 @@ class _FoldersTabState extends State<FoldersTab>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      ),
+      builder: (context) =>
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
     );
     progressOpen = true;
 

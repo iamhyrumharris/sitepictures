@@ -4,11 +4,14 @@ import 'package:provider/provider.dart';
 
 import '../../models/equipment.dart';
 import '../../models/folder_photo.dart';
+import '../../models/import_batch.dart';
 import '../../models/photo.dart';
 import '../../models/photo_folder.dart';
 import '../../providers/all_photos_provider.dart';
 import '../../providers/auth_state.dart';
 import '../../providers/equipment_navigator_provider.dart';
+import '../../providers/import_flow_provider.dart';
+import '../../providers/needs_assigned_provider.dart';
 import '../../screens/equipment_navigator_page.dart';
 import '../../services/database_service.dart';
 import '../../services/folder_service.dart';
@@ -16,7 +19,10 @@ import '../../services/needs_assigned_move_service.dart';
 import '../../services/photo_storage_service.dart';
 import '../../widgets/create_folder_dialog.dart';
 import '../../widgets/fab_visibility_scope.dart';
+import '../../widgets/import_destination_picker.dart';
+import '../../widgets/import_progress_sheet.dart';
 import '../../widgets/photo_grid_tile.dart';
+import '../../router.dart';
 
 class AllPhotosScreen extends StatefulWidget {
   const AllPhotosScreen({super.key});
@@ -32,6 +38,56 @@ class _AllPhotosScreenState extends State<AllPhotosScreen>
   bool _isPerformingAction = false;
   final Set<String> _selectedPhotoIds = <String>{};
   FabVisibilityController? _fabController;
+
+  Future<void> _handleImport(BuildContext context) async {
+    final importFlow = context.read<ImportFlowProvider>();
+    final selection = await showImportDestinationPicker(
+      context: context,
+      entryPoint: ImportEntryPoint.allPhotos,
+    );
+
+    if (selection == null) {
+      return;
+    }
+
+    importFlow.configure(
+      entryPoint: ImportEntryPoint.allPhotos,
+      defaultDestination: selection.destination,
+      beforeAfterChoice: selection.beforeAfterChoice,
+      navigatorKey: AppRouter.router.routerDelegate.navigatorKey,
+      initialPermissionState: importFlow.permissionState,
+    );
+
+    final result = await showImportProgressSheet(
+      context,
+      provider: importFlow,
+      onStart: () => importFlow.startImport(pickerContext: context),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result != null) {
+      try {
+        await context.read<NeedsAssignedProvider>().loadGlobalNeedsAssigned();
+      } catch (_) {}
+      try {
+        await context.read<AllPhotosProvider>().refresh();
+      } catch (_) {}
+
+      final batch = result.batch;
+      final summary =
+          '${batch.importedCount} imported, ${batch.duplicateCount} duplicate(s) skipped, ${batch.failedCount} failed';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(summary)));
+    } else if (importFlow.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(importFlow.errorMessage!)));
+    }
+  }
 
   @override
   void initState() {
@@ -192,6 +248,12 @@ class _AllPhotosScreenState extends State<AllPhotosScreen>
     return AppBar(
       title: const Text('All Photos'),
       actions: [
+        IconButton(
+          tooltip: 'Import Photos',
+          icon: const Icon(Icons.file_upload_outlined),
+          onPressed:
+              _isPerformingAction ? null : () => _handleImport(context),
+        ),
         IconButton(
           tooltip: 'Refresh',
           icon: const Icon(Icons.refresh),
