@@ -152,38 +152,101 @@ class SubSite {
   final DateTime updatedAt;
   final bool isActive;
 
-  SubSite({
+  factory SubSite({
     String? id,
-    this.clientId,
-    this.mainSiteId,
-    this.parentSubSiteId,
+    String? clientId,
+    String? mainSiteId,
+    String? parentSubSiteId,
+    required String name,
+    String? description,
+    required String createdBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool isActive = true,
+  }) {
+    final normalizedClientId = _normalizeId(clientId);
+    final normalizedMainSiteId = _normalizeId(mainSiteId);
+    final normalizedParentSubSiteId = _normalizeId(parentSubSiteId);
+
+    assert(
+      _hasAtMostOneParent(
+        normalizedClientId,
+        normalizedMainSiteId,
+        normalizedParentSubSiteId,
+      ),
+      'SubSite can belong to at most one of: Client, MainSite, or ParentSubSite',
+    );
+
+    return SubSite._(
+      id: id ?? const Uuid().v4(),
+      clientId: normalizedClientId,
+      mainSiteId: normalizedMainSiteId,
+      parentSubSiteId: normalizedParentSubSiteId,
+      name: name,
+      description: description,
+      createdBy: createdBy,
+      createdAt: createdAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? DateTime.now(),
+      isActive: isActive,
+    );
+  }
+
+  SubSite._({
+    required this.id,
+    required this.clientId,
+    required this.mainSiteId,
+    required this.parentSubSiteId,
     required this.name,
     this.description,
     required this.createdBy,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    this.isActive = true,
-  }) : assert(
-         (clientId != null) ^ (mainSiteId != null) ^ (parentSubSiteId != null),
-         'SubSite must belong to exactly one of: Client, MainSite, or ParentSubSite (XOR constraint)',
-       ),
-       id = id ?? const Uuid().v4(),
-       createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+    required this.createdAt,
+    required this.updatedAt,
+    required this.isActive,
+  });
 
   // Validation
   bool isValid() {
     if (name.isEmpty || name.length > 100) return false;
     if (createdBy.isEmpty) return false;
-    // XOR validation: exactly one of clientId, mainSiteId, or parentSubSiteId must be non-null
-    final hasClient = clientId != null;
-    final hasMainSite = mainSiteId != null;
-    final hasParent = parentSubSiteId != null;
-    if (hasClient && hasMainSite) return false;
-    if (hasClient && hasParent) return false;
-    if (hasMainSite && hasParent) return false;
-    if (!hasClient && !hasMainSite && !hasParent) return false;
+    if (!_hasExactlyOneParent(clientId, mainSiteId, parentSubSiteId)) {
+      return false;
+    }
     return true;
+  }
+
+  static String? _normalizeId(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed;
+  }
+
+  static int _parentCount(
+    String? clientId,
+    String? mainSiteId,
+    String? parentSubSiteId,
+  ) {
+    var count = 0;
+    if (clientId != null) count++;
+    if (mainSiteId != null) count++;
+    if (parentSubSiteId != null) count++;
+    return count;
+  }
+
+  static bool _hasAtMostOneParent(
+    String? clientId,
+    String? mainSiteId,
+    String? parentSubSiteId,
+  ) {
+    return _parentCount(clientId, mainSiteId, parentSubSiteId) <= 1;
+  }
+
+  static bool _hasExactlyOneParent(
+    String? clientId,
+    String? mainSiteId,
+    String? parentSubSiteId,
+  ) {
+    return _parentCount(clientId, mainSiteId, parentSubSiteId) == 1;
   }
 
   // Convert to Map for database storage
