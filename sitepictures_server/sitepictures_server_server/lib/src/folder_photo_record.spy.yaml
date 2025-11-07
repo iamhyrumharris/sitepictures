@@ -1,0 +1,15 @@
+class: FolderPhotoRecord
+table: folder_photo_records
+fields:
+  folderId: String
+  photoId: String
+  beforeAfter: String
+  addedAt: DateTime
+indexes:
+  folder_photo_record_folder_id:
+    fields: folderId
+  folder_photo_record_photo_id:
+    fields: photoId
+  folder_photo_record_folder_photo:
+    fields: folderId, photoId
+    unique: true

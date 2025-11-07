@@ -1,0 +1,15 @@
+class: ClientRecord
+table: client_records
+fields:
+  clientId: String
+  name: String
+  description: String?
+  isSystem: bool
+  createdBy: String
+  createdAt: DateTime
+  updatedAt: DateTime
+  isActive: bool
+indexes:
+  client_record_client_id:
+    fields: clientId
+    unique: true

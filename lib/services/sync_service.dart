@@ -1,15 +1,43 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
+
+import '../models/client.dart';
+import '../models/photo.dart';
+import '../models/site.dart';
+import '../models/equipment.dart';
+import '../models/photo_folder.dart';
+import '../models/folder_photo.dart';
+import '../models/duplicate_registry_entry.dart';
 import '../models/sync_queue_item.dart';
-import 'database_service.dart';
 import 'api_service.dart';
+import 'database_service.dart';
 import 'photo_storage_service.dart';
+import 'serverpod_client_service.dart';
+import 'serverpod_site_service.dart';
+import 'serverpod_photo_service.dart';
+import 'serverpod_equipment_service.dart';
+import 'serverpod_folder_service.dart';
+import 'serverpod_import_service.dart';
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
   final DatabaseService _dbService = DatabaseService();
   final ApiService _apiService = ApiService();
+  final ServerpodPhotoService _remotePhotoService =
+      ServerpodPhotoService.instance;
+  final ServerpodClientService _remoteClientService =
+      ServerpodClientService.instance;
+  final ServerpodSiteService _remoteSiteService =
+      ServerpodSiteService.instance;
+  final ServerpodEquipmentService _remoteEquipmentService =
+      ServerpodEquipmentService.instance;
+  final ServerpodFolderService _remoteFolderService =
+      ServerpodFolderService.instance;
+  final ServerpodImportService _remoteImportService =
+      ServerpodImportService.instance;
 
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
@@ -97,6 +125,16 @@ class SyncService {
         }
       }
 
+      await _pullRemoteClients();
+      await _pullRemotePhotoFolders();
+      await _pullRemoteFolderPhotos();
+      await _pullRemoteMainSites();
+      await _pullRemoteSubSites();
+      await _pullRemoteEquipment();
+      await _pullRemoteImportBatches();
+      await _pullRemoteDuplicateEntries();
+      await _pullRemotePhotos();
+
       _lastSyncTime = DateTime.now();
       _isSyncing = false;
       return true;
@@ -110,21 +148,28 @@ class SyncService {
     final payload = jsonDecode(item.payload) as Map<String, dynamic>;
     http.Response? response;
 
-    switch (item.entityType) {
+    final type = item.entityType.toLowerCase();
+    switch (type) {
       case 'photo':
         response = await _syncPhoto(item, payload);
         break;
       case 'client':
         response = await _syncClient(item, payload);
         break;
-      case 'mainSite':
+      case 'mainsite':
         response = await _syncMainSite(item, payload);
         break;
-      case 'subSite':
+      case 'subsite':
         response = await _syncSubSite(item, payload);
         break;
       case 'equipment':
         response = await _syncEquipment(item, payload);
+        break;
+      case 'photofolder':
+        response = await _syncPhotoFolder(item, payload);
+        break;
+      case 'folderphoto':
+        response = await _syncFolderPhoto(item, payload);
         break;
     }
 
@@ -141,99 +186,492 @@ class SyncService {
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    if (item.operation == 'create') {
-      final storedPath = payload['filePath'] as String;
-      final file = PhotoStorageService.tryResolveLocalFile(storedPath);
-
-      if (file != null && await file.exists()) {
-        final response = await _apiService.uploadFile(
-          '/equipment/${payload['equipmentId']}/photos',
-          file.path,
-          {
-            'latitude': payload['latitude'].toString(),
-            'longitude': payload['longitude'].toString(),
-            'timestamp': payload['timestamp'].toString(),
-          },
-        );
-
-        return http.Response(
-          await response.stream.bytesToString(),
-          response.statusCode,
-        );
-      }
+    if (item.operation != 'create') {
+      return http.Response('', 400);
     }
 
-    return http.Response('', 400);
+    final db = await _dbService.database;
+    final results = await db.query(
+      'photos',
+      where: 'id = ?',
+      whereArgs: [item.entityId],
+      limit: 1,
+    );
+
+    if (results.isEmpty) {
+      return http.Response('', 404);
+    }
+
+    final photo = Photo.fromMap(results.first);
+    final file = PhotoStorageService.tryResolveLocalFile(photo.filePath);
+    Uint8List? bytes;
+    if (file != null && await file.exists()) {
+      bytes = await file.readAsBytes();
+    }
+
+    await _remotePhotoService.uploadPhoto(
+      photo: photo,
+      fileBytes: bytes,
+    );
+
+    await db.update(
+      'photos',
+      {
+        'is_synced': 1,
+        'synced_at': DateTime.now().toIso8601String(),
+        'remote_url': 'remote://${photo.id}',
+      },
+      where: 'id = ?',
+      whereArgs: [photo.id],
+    );
+
+    return http.Response('ok', 200);
+  }
+
+  Future<void> _pullRemoteClients() async {
+    try {
+      final lastSync = await _dbService.getLatestClientUpdatedAt();
+      final remoteClients = await _remoteClientService.pullClients(lastSync);
+      if (remoteClients.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final client in remoteClients) {
+        final clientMap = client.toMap();
+        final existing = await db.query(
+          'clients',
+          where: 'id = ?',
+          whereArgs: [client.id],
+          limit: 1,
+        );
+
+        if (existing.isEmpty) {
+          await db.insert('clients', clientMap);
+        } else {
+          await db.update(
+            'clients',
+            clientMap,
+            where: 'id = ?',
+            whereArgs: [client.id],
+          );
+        }
+      }
+    } catch (_) {
+      // Ignore pull errors to keep sync resilient.
+    }
+  }
+
+  Future<void> _pullRemotePhotoFolders() async {
+    try {
+      final lastSync = await _dbService.getLatestPhotoFolderUpdatedAt();
+      final remoteFolders = await _remoteFolderService.pullFolders(lastSync);
+      if (remoteFolders.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final folder in remoteFolders) {
+        final map = folder.toMap();
+        final existing = await db.query(
+          'photo_folders',
+          where: 'id = ?',
+          whereArgs: [folder.id],
+          limit: 1,
+        );
+        if (existing.isEmpty) {
+          await db.insert('photo_folders', map);
+        } else {
+          await db.update(
+            'photo_folders',
+            map,
+            where: 'id = ?',
+            whereArgs: [folder.id],
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pullRemoteFolderPhotos() async {
+    try {
+      final lastSync = await _dbService.getLatestFolderPhotoAddedAt();
+      final remoteLinks =
+          await _remoteFolderService.pullFolderPhotos(lastSync);
+      if (remoteLinks.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final link in remoteLinks) {
+        await db.insert(
+          'folder_photos',
+          link.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pullRemoteMainSites() async {
+    try {
+      final lastSync = await _dbService.getLatestMainSiteUpdatedAt();
+      final remoteSites = await _remoteSiteService.pullMainSites(lastSync);
+      if (remoteSites.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final site in remoteSites) {
+        final map = site.toMap();
+        final existing = await db.query(
+          'main_sites',
+          where: 'id = ?',
+          whereArgs: [site.id],
+          limit: 1,
+        );
+        if (existing.isEmpty) {
+          await db.insert('main_sites', map);
+        } else {
+          await db.update(
+            'main_sites',
+            map,
+            where: 'id = ?',
+            whereArgs: [site.id],
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pullRemoteSubSites() async {
+    try {
+      final lastSync = await _dbService.getLatestSubSiteUpdatedAt();
+      final remoteSites = await _remoteSiteService.pullSubSites(lastSync);
+      if (remoteSites.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final site in remoteSites) {
+        final map = site.toMap();
+        final existing = await db.query(
+          'sub_sites',
+          where: 'id = ?',
+          whereArgs: [site.id],
+          limit: 1,
+        );
+        if (existing.isEmpty) {
+          await db.insert('sub_sites', map);
+        } else {
+          await db.update(
+            'sub_sites',
+            map,
+            where: 'id = ?',
+            whereArgs: [site.id],
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pullRemoteEquipment() async {
+    try {
+      final lastSync = await _dbService.getLatestEquipmentUpdatedAt();
+      final remoteEquipment =
+          await _remoteEquipmentService.pullEquipment(lastSync);
+      if (remoteEquipment.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final equipment in remoteEquipment) {
+        final map = equipment.toMap();
+        final existing = await db.query(
+          'equipment',
+          where: 'id = ?',
+          whereArgs: [equipment.id],
+          limit: 1,
+        );
+        if (existing.isEmpty) {
+          await db.insert('equipment', map);
+        } else {
+          await db.update(
+            'equipment',
+            map,
+            where: 'id = ?',
+            whereArgs: [equipment.id],
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pullRemotePhotos() async {
+    try {
+      final lastSync = await _dbService.getLatestPhotoSyncTimestamp();
+      final remotePayloads = await _remotePhotoService.pullPhotos(lastSync);
+      if (remotePayloads.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final payload in remotePayloads) {
+        if (payload.bytes == null) {
+          continue;
+        }
+
+        final storedPath = await PhotoStorageService.saveRemoteBytes(
+          payload.bytes!,
+          remoteId: payload.record.clientId,
+        );
+
+        final photo = _remotePhotoService.toLocalPhoto(
+          record: payload.record,
+          filePath: storedPath,
+        );
+
+        final photoMap = photo.toMap()
+          ..addAll({
+            'file_path': storedPath,
+            'is_synced': 1,
+            'synced_at': payload.record.updatedAt.toIso8601String(),
+            'remote_url': photo.remoteUrl,
+          });
+
+        final existing = await db.query(
+          'photos',
+          where: 'id = ?',
+          whereArgs: [photo.id],
+          limit: 1,
+        );
+
+        if (existing.isEmpty) {
+          await db.insert('photos', photoMap);
+        } else {
+          await db.update(
+            'photos',
+            photoMap,
+            where: 'id = ?',
+            whereArgs: [photo.id],
+          );
+        }
+      }
+    } catch (_) {
+      // Remote pull is best effort; ignore failures to keep sync loop resilient.
+    }
+  }
+
+  Future<void> _pullRemoteImportBatches() async {
+    try {
+      final lastSync = await _dbService.getLatestImportBatchUpdatedAt();
+      final remoteBatches = await _remoteImportService.pullBatches(lastSync);
+      if (remoteBatches.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final batch in remoteBatches) {
+        await db.insert(
+          'import_batches',
+          batch.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pullRemoteDuplicateEntries() async {
+    try {
+      final lastSync = await _dbService.getLatestDuplicateImportedAt();
+      final remoteEntries =
+          await _remoteImportService.pullDuplicates(lastSync);
+      if (remoteEntries.isEmpty) {
+        return;
+      }
+
+      final db = await _dbService.database;
+      for (final entry in remoteEntries) {
+        await db.insert(
+          'duplicate_registry',
+          DuplicateRegistryEntry(
+            id: entry.id,
+            photoId: entry.photoId,
+            sourceAssetId: entry.sourceAssetId,
+            fingerprintSha1: entry.fingerprintSha1,
+            importedAt: entry.importedAt.toLocal(),
+          ).toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    } catch (_) {}
   }
 
   Future<http.Response> _syncClient(
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post('/clients', payload);
-      case 'update':
-        return await _apiService.put('/clients/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/clients/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    final client = Client.fromJson(payload);
+    await _remoteClientService.upsertClient(client);
+
+    final db = await _dbService.database;
+    final clientMap = client.toMap();
+    final existing = await db.query(
+      'clients',
+      where: 'id = ?',
+      whereArgs: [client.id],
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('clients', clientMap);
+    } else {
+      await db.update(
+        'clients',
+        clientMap,
+        where: 'id = ?',
+        whereArgs: [client.id],
+      );
     }
+
+    return http.Response('ok', 200);
   }
 
   Future<http.Response> _syncMainSite(
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post(
-          '/clients/${payload['clientId']}/sites',
-          payload,
-        );
-      case 'update':
-        return await _apiService.put('/sites/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/sites/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    final site = MainSite.fromJson(payload);
+    await _remoteSiteService.upsertMainSite(site);
+
+    final db = await _dbService.database;
+    final map = site.toMap();
+    final existing = await db.query(
+      'main_sites',
+      where: 'id = ?',
+      whereArgs: [site.id],
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('main_sites', map);
+    } else {
+      await db.update(
+        'main_sites',
+        map,
+        where: 'id = ?',
+        whereArgs: [site.id],
+      );
     }
+
+    return http.Response('ok', 200);
   }
 
   Future<http.Response> _syncSubSite(
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post(
-          '/sites/${payload['mainSiteId']}/subsites',
-          payload,
-        );
-      case 'update':
-        return await _apiService.put('/subsites/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/subsites/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    final site = SubSite.fromJson(payload);
+    await _remoteSiteService.upsertSubSite(site);
+
+    final db = await _dbService.database;
+    final map = site.toMap();
+    final existing = await db.query(
+      'sub_sites',
+      where: 'id = ?',
+      whereArgs: [site.id],
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('sub_sites', map);
+    } else {
+      await db.update(
+        'sub_sites',
+        map,
+        where: 'id = ?',
+        whereArgs: [site.id],
+      );
     }
+
+    return http.Response('ok', 200);
   }
 
   Future<http.Response> _syncEquipment(
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post('/equipment', payload);
-      case 'update':
-        return await _apiService.put('/equipment/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/equipment/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    final equipment = Equipment.fromJson(payload);
+    await _remoteEquipmentService.upsertEquipment(equipment);
+
+    final db = await _dbService.database;
+    final map = equipment.toMap();
+    final existing = await db.query(
+      'equipment',
+      where: 'id = ?',
+      whereArgs: [equipment.id],
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('equipment', map);
+    } else {
+      await db.update(
+        'equipment',
+        map,
+        where: 'id = ?',
+        whereArgs: [equipment.id],
+      );
     }
+
+    return http.Response('ok', 200);
+  }
+
+  Future<http.Response> _syncPhotoFolder(
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
+    final folder = PhotoFolder.fromJson(payload);
+    await _remoteFolderService.upsertFolder(folder);
+
+    final db = await _dbService.database;
+    final map = folder.toMap();
+    final existing = await db.query(
+      'photo_folders',
+      where: 'id = ?',
+      whereArgs: [folder.id],
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('photo_folders', map);
+    } else {
+      await db.update(
+        'photo_folders',
+        map,
+        where: 'id = ?',
+        whereArgs: [folder.id],
+      );
+    }
+
+    return http.Response('ok', 200);
+  }
+
+  Future<http.Response> _syncFolderPhoto(
+    SyncQueueItem item,
+    Map<String, dynamic> payload,
+  ) async {
+    final link = FolderPhoto.fromJson(payload);
+    await _remoteFolderService.upsertFolderPhoto(link);
+
+    final db = await _dbService.database;
+    await db.insert(
+      'folder_photos',
+      link.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    return http.Response('ok', 200);
   }
 
   Future<void> _markSyncComplete(SyncQueueItem item) async {

@@ -6,12 +6,15 @@ import '../models/folder_photo.dart';
 import '../models/import_batch.dart';
 import '../models/photo.dart';
 import 'database_service.dart';
+import 'serverpod_import_service.dart';
 
 class ImportRepository {
   ImportRepository({DatabaseService? databaseService})
     : _databaseService = databaseService ?? DatabaseService();
 
   final DatabaseService _databaseService;
+  final ServerpodImportService _importService =
+      ServerpodImportService.instance;
   static const _uuid = Uuid();
 
   Future<Database> get _db async => _databaseService.database;
@@ -19,6 +22,11 @@ class ImportRepository {
   Future<ImportBatch> insertBatch(ImportBatch batch) async {
     final db = await _db;
     await db.insert('import_batches', batch.toMap());
+    try {
+      await _importService.upsertBatch(batch);
+    } catch (_) {
+      // Best-effort remote sync.
+    }
     return batch;
   }
 
@@ -31,10 +39,14 @@ class ImportRepository {
         'duplicate_count': batch.duplicateCount,
         'failed_count': batch.failedCount,
         'completed_at': batch.completedAt?.toIso8601String(),
+        'updated_at': batch.updatedAt.toIso8601String(),
       },
       where: 'id = ?',
       whereArgs: [batch.id],
     );
+    try {
+      await _importService.upsertBatch(batch);
+    } catch (_) {}
   }
 
   Future<Photo> insertPhoto({
@@ -123,5 +135,8 @@ class ImportRepository {
       entry.toMap(),
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+    try {
+      await _importService.logDuplicate(entry);
+    } catch (_) {}
   }
 }

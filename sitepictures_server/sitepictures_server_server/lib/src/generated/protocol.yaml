@@ -1,0 +1,27 @@
+account:
+  - registerUser:
+client:
+  - upsertClient:
+  - pullClients:
+equipment:
+  - upsertEquipment:
+  - pullEquipment:
+folder:
+  - upsertFolder:
+  - pullFolders:
+  - upsertFolderPhoto:
+  - pullFolderPhotos:
+import:
+  - upsertBatch:
+  - pullBatches:
+  - logDuplicate:
+  - pullDuplicates:
+photo:
+  - upsertPhoto:
+  - pullPhotos:
+  - downloadPhoto:
+site:
+  - upsertMainSite:
+  - upsertSubSite:
+  - pullMainSites:
+  - pullSubSites:

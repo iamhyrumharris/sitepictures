@@ -7,6 +7,7 @@ class PhotoFolder {
   final String name;
   final String workOrder;
   final DateTime createdAt;
+  final DateTime updatedAt;
   final String createdBy;
   final bool isDeleted;
 
@@ -16,10 +17,12 @@ class PhotoFolder {
     required this.workOrder,
     required this.createdBy,
     DateTime? createdAt,
+    DateTime? updatedAt,
     bool? isDeleted,
     String? name,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now(),
        isDeleted = isDeleted ?? false,
        name = _normalizeName(
          name,
@@ -63,6 +66,7 @@ class PhotoFolder {
       'name': name,
       'work_order': workOrder,
       'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
       'created_by': createdBy,
       'is_deleted': isDeleted ? 1 : 0,
     };
@@ -77,8 +81,37 @@ class PhotoFolder {
       workOrder: map['work_order'],
       createdBy: map['created_by'],
       createdAt: DateTime.parse(map['created_at']),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'])
+          : DateTime.parse(map['created_at']),
       isDeleted: map['is_deleted'] == 1,
     );
+  }
+
+  factory PhotoFolder.fromJson(Map<String, dynamic> json) {
+    return PhotoFolder(
+      id: json['id'] as String,
+      equipmentId: json['equipmentId'] as String,
+      name: json['name'] as String,
+      workOrder: json['workOrder'] as String,
+      createdBy: json['createdBy'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      isDeleted: json['isDeleted'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'equipmentId': equipmentId,
+      'name': name,
+      'workOrder': workOrder,
+      'createdBy': createdBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isDeleted': isDeleted,
+    };
   }
 
   /// Create copy with updates
@@ -88,6 +121,7 @@ class PhotoFolder {
     String? workOrder,
     String? createdBy,
     DateTime? createdAt,
+    DateTime? updatedAt,
     bool? isDeleted,
   }) {
     return PhotoFolder(
@@ -97,6 +131,7 @@ class PhotoFolder {
       workOrder: workOrder ?? this.workOrder,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
       isDeleted: isDeleted ?? this.isDeleted,
     );
   }

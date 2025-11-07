@@ -1,0 +1,25 @@
+class: EquipmentRecord
+table: equipment_records
+fields:
+  equipmentId: String
+  clientId: String?
+  mainSiteId: String?
+  subSiteId: String?
+  name: String
+  serialNumber: String?
+  manufacturer: String?
+  model: String?
+  createdBy: String
+  createdAt: DateTime
+  updatedAt: DateTime
+  isActive: bool
+indexes:
+  equipment_record_equipment_id:
+    fields: equipmentId
+    unique: true
+  equipment_record_client_id:
+    fields: clientId
+  equipment_record_main_site_id:
+    fields: mainSiteId
+  equipment_record_sub_site_id:
+    fields: subSiteId

@@ -638,6 +638,7 @@ class ImportServiceImpl implements ImportService {
       'name': name,
       'work_order': workOrder,
       'created_at': now,
+      'updated_at': now,
       'created_by': 'SYSTEM',
       'is_deleted': 0,
     });

@@ -22,15 +22,6 @@ class AuthState extends ChangeNotifier {
     _currentUser = _authService.currentUser;
     _isAuthenticated = _authService.isAuthenticated;
 
-    // Development mode: Auto-login with test user if not authenticated
-    if (!_isAuthenticated) {
-      debugPrint('AuthState: No stored credentials, attempting auto-login...');
-      final success = await login('test@test.com', 'test123');
-      if (success) {
-        debugPrint('AuthState: Auto-login successful');
-      }
-    }
-
     _isLoading = false;
     notifyListeners();
   }
@@ -57,6 +48,30 @@ class AuthState extends ChangeNotifier {
     _currentUser = null;
     _isAuthenticated = false;
     notifyListeners();
+  }
+
+  Future<RegistrationResult> register({
+    required String fullName,
+    required String email,
+    required String password,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final result = await _authService.register(
+      fullName: fullName,
+      email: email,
+      password: password,
+    );
+
+    if (result.success) {
+      _currentUser = _authService.currentUser;
+      _isAuthenticated = true;
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return result;
   }
 
   bool hasPermission(String permission) {

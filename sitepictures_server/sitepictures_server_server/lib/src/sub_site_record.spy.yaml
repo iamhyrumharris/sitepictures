@@ -1,0 +1,23 @@
+class: SubSiteRecord
+table: sub_site_records
+fields:
+  subSiteId: String
+  clientId: String?
+  mainSiteId: String?
+  parentSubSiteId: String?
+  name: String
+  description: String?
+  createdBy: String
+  createdAt: DateTime
+  updatedAt: DateTime
+  isActive: bool
+indexes:
+  sub_site_record_sub_site_id:
+    fields: subSiteId
+    unique: true
+  sub_site_record_client_id:
+    fields: clientId
+  sub_site_record_main_site_id:
+    fields: mainSiteId
+  sub_site_record_parent_id:
+    fields: parentSubSiteId

@@ -1,0 +1,22 @@
+### Canonical record for a photo stored in Postgres.
+class: PhotoRecord
+table: photo_records
+fields:
+  clientId: String
+  equipmentId: String
+  capturedBy: String
+  latitude: double
+  longitude: double
+  timestamp: DateTime
+  fileSize: int
+  importSource: String
+  fingerprintSha1: String?
+  importBatchId: String?
+  remoteUrl: String?
+  storagePath: String?
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  photo_record_client_id:
+    fields: clientId
+    unique: true

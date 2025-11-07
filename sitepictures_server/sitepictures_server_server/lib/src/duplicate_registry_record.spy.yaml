@@ -1,0 +1,14 @@
+class: DuplicateRegistryRecord
+table: duplicate_registry_records
+fields:
+  duplicateId: String
+  photoId: String
+  sourceAssetId: String?
+  fingerprintSha1: String?
+  importedAt: DateTime
+indexes:
+  duplicate_registry_record_id:
+    fields: duplicateId
+    unique: true
+  duplicate_registry_record_photo_id:
+    fields: photoId

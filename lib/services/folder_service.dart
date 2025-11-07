@@ -60,7 +60,10 @@ class FolderService {
     final db = await _dbService.database;
     final updated = await db.update(
       'photo_folders',
-      {'name': trimmed},
+      {
+        'name': trimmed,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
       where: 'id = ? AND is_deleted = 0',
       whereArgs: [folderId],
     );
@@ -103,7 +106,10 @@ class FolderService {
       // Soft delete the folder
       await txn.update(
         'photo_folders',
-        {'is_deleted': 1},
+        {
+          'is_deleted': 1,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
         where: 'id = ?',
         whereArgs: [folderId],
       );

@@ -15,6 +15,7 @@ import 'services/photo_storage_service.dart';
 import 'services/import_repository.dart';
 import 'services/import_service.dart';
 import 'services/analytics_logger.dart';
+import 'services/serverpod_service.dart';
 import 'router.dart';
 
 void main() async {
@@ -23,6 +24,8 @@ void main() async {
   // Initialize services
   final dbService = DatabaseService();
   await dbService.database; // Ensure database is initialized
+
+  await ServerpodService.instance.initialize();
 
   final authService = AuthService();
   await authService.initialize();

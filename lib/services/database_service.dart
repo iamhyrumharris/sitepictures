@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -142,6 +142,7 @@ class DatabaseService {
         completed_at TEXT,
         permission_state TEXT NOT NULL,
         device_free_space_bytes INTEGER,
+        updated_at TEXT NOT NULL,
         FOREIGN KEY (equipment_id) REFERENCES equipment (id)
       )
     ''');
@@ -274,6 +275,9 @@ class DatabaseService {
 
     // Create indexes for performance optimization
     await _createIndexes(db);
+
+    // Seed system clients (e.g., Needs Assigned)
+    await _ensureGlobalNeedsAssignedClient(db);
   }
 
   Future<void> _createIndexes(Database db) async {
@@ -371,6 +375,17 @@ class DatabaseService {
     if (oldVersion < 7) {
       await _migration007(db);
     }
+    // Migration 008: Photo folder updated_at column
+    if (oldVersion < 8) {
+      await _migration008(db);
+    }
+    // Migration 009: Import batch updated_at column
+    if (oldVersion < 9) {
+      await _migration009(db);
+    }
+
+    // Ensure system clients exist after migrations.
+    await _ensureGlobalNeedsAssignedClient(db);
   }
 
   Future<void> _migration002(Database db) async {
@@ -447,6 +462,7 @@ class DatabaseService {
         completed_at TEXT,
         permission_state TEXT NOT NULL,
         device_free_space_bytes INTEGER,
+        updated_at TEXT NOT NULL,
         FOREIGN KEY (equipment_id) REFERENCES equipment (id)
       )
     ''');
@@ -481,6 +497,61 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_duplicate_registry_fingerprint ON duplicate_registry(fingerprint_sha1)',
+    );
+  }
+
+  Future<void> _migration008(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(photo_folders)');
+    final hasUpdatedAt = columns.any(
+      (column) => column['name'] == 'updated_at',
+    );
+    if (!hasUpdatedAt) {
+      await db.execute(
+        'ALTER TABLE photo_folders ADD COLUMN updated_at TEXT',
+      );
+      await db.execute(
+        '''
+        UPDATE photo_folders
+        SET updated_at = created_at
+        WHERE updated_at IS NULL OR updated_at = ''
+        ''',
+      );
+    }
+  }
+
+  Future<void> _migration009(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(import_batches)');
+    final hasUpdatedAt = columns.any(
+      (column) => column['name'] == 'updated_at',
+    );
+    if (!hasUpdatedAt) {
+      await db.execute(
+        'ALTER TABLE import_batches ADD COLUMN updated_at TEXT',
+      );
+      await db.execute(
+        '''
+        UPDATE import_batches
+        SET updated_at = COALESCE(completed_at, started_at)
+        WHERE updated_at IS NULL OR updated_at = ''
+        ''',
+      );
+    }
+  }
+
+  Future<void> _ensureGlobalNeedsAssignedClient(Database db) async {
+    await db.insert(
+      'clients',
+      {
+        'id': 'GLOBAL_NEEDS_ASSIGNED',
+        'name': 'Needs Assigned',
+        'description': 'Global holding area for unorganized photos',
+        'is_system': 1,
+        'created_by': 'SYSTEM',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'is_active': 1,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
 
@@ -609,16 +680,7 @@ class DatabaseService {
     );
 
     // Create global "Needs Assigned" client
-    await db.insert('clients', {
-      'id': 'GLOBAL_NEEDS_ASSIGNED',
-      'name': 'Needs Assigned',
-      'description': 'Global holding area for unorganized photos',
-      'is_system': 1,
-      'created_by': 'SYSTEM',
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-      'is_active': 1,
-    });
+    await _ensureGlobalNeedsAssignedClient(db);
 
     // Create index for filtering out system clients from user lists
     await db.execute(
@@ -904,5 +966,145 @@ class DatabaseService {
     ''',
       [equipmentId],
     );
+  }
+
+  Future<DateTime?> getLatestClientUpdatedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT updated_at FROM clients
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['updated_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestPhotoSyncTimestamp() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT synced_at FROM photos
+        WHERE synced_at IS NOT NULL
+        ORDER BY datetime(synced_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) {
+      return null;
+    }
+    final value = result.first['synced_at'] as String?;
+    if (value == null) {
+      return null;
+    }
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestMainSiteUpdatedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT updated_at FROM main_sites
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['updated_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestSubSiteUpdatedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT updated_at FROM sub_sites
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['updated_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestEquipmentUpdatedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT updated_at FROM equipment
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['updated_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestPhotoFolderUpdatedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT updated_at FROM photo_folders
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['updated_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestFolderPhotoAddedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT added_at FROM folder_photos
+        ORDER BY datetime(added_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['added_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestImportBatchUpdatedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT updated_at FROM import_batches
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['updated_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<DateTime?> getLatestDuplicateImportedAt() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+        SELECT imported_at FROM duplicate_registry
+        ORDER BY datetime(imported_at) DESC
+        LIMIT 1
+      ''',
+    );
+    if (result.isEmpty) return null;
+    final value = result.first['imported_at'] as String?;
+    if (value == null) return null;
+    return DateTime.tryParse(value);
   }
 }

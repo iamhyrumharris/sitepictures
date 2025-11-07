@@ -1,0 +1,21 @@
+class: ImportBatchRecord
+table: import_batch_records
+fields:
+  batchId: String
+  entryPoint: String
+  equipmentId: String?
+  folderId: String?
+  destinationCategory: String
+  selectedCount: int
+  importedCount: int
+  duplicateCount: int
+  failedCount: int
+  startedAt: DateTime
+  completedAt: DateTime?
+  permissionState: String
+  deviceFreeSpaceBytes: int?
+  updatedAt: DateTime
+indexes:
+  import_batch_record_batch_id:
+    fields: batchId
+    unique: true

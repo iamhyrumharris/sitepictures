@@ -226,6 +226,7 @@ class QuickSaveService {
       'name': name,
       'work_order': 'Quick Save',
       'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
       'created_by': 'SYSTEM',
       'is_deleted': 0,
     });

@@ -1,0 +1,19 @@
+class: MainSiteRecord
+table: main_site_records
+fields:
+  mainSiteId: String
+  clientId: String
+  name: String
+  address: String?
+  latitude: double?
+  longitude: double?
+  createdBy: String
+  createdAt: DateTime
+  updatedAt: DateTime
+  isActive: bool
+indexes:
+  main_site_record_main_site_id:
+    fields: mainSiteId
+    unique: true
+  main_site_record_client_id:
+    fields: clientId

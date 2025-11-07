@@ -212,33 +212,50 @@ class _HomeScreenState extends State<HomeScreen> {
                       : null,
                 ),
                 if (_clients == null || _clients!.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
+                  Padding(
+                    padding: const EdgeInsets.all(32),
                     child: Center(
                       child: Column(
                         children: [
-                          Icon(Icons.business, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
+                          const Icon(Icons.business, size: 64, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text(
                             'Add Your First Client',
                             style: TextStyle(fontSize: 18, color: Colors.grey),
                           ),
+                          const SizedBox(height: 16),
+                          if (authState.hasPermission('create'))
+                            ElevatedButton.icon(
+                              onPressed: _showAddClientDialog,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add New Client'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4A90E2),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
                         ],
                       ),
                     ),
                   )
                 else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _clients!.length,
-                    itemBuilder: (context, index) {
-                      final client = _clients![index];
-                      return ClientListTile(
-                        client: client,
-                        onTap: () => _navigateToClient(client),
-                      );
-                    },
+                  Column(
+                    children: [
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _clients!.length,
+                        itemBuilder: (context, index) {
+                          final client = _clients![index];
+                          return ClientListTile(
+                            client: client,
+                            onTap: () => _navigateToClient(client),
+                          );
+                        },
+                      ),
+                      if (authState.hasPermission('create'))
+                        _buildAddClientCta(),
+                    ],
                   ),
               ],
             ),
@@ -269,8 +286,28 @@ class _HomeScreenState extends State<HomeScreen> {
     return IconButton(
       visualDensity: VisualDensity.compact,
       onPressed: _showAddClientDialog,
-      icon: const Icon(Icons.add, color: Colors.black87),
-      tooltip: 'Add Client',
+      icon: const Icon(Icons.add, color: Color(0xFF4A90E2)),
+      tooltip: 'Add New Client',
+    );
+  }
+
+  Widget _buildAddClientCta() {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      color: const Color(0xFFE8F1FD),
+      child: ListTile(
+        onTap: _showAddClientDialog,
+        leading:
+            const Icon(Icons.add_circle_outline, color: Color(0xFF4A90E2)),
+        title: const Text(
+          'Add New Client',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: const Text(
+          'Create a client to organize its sites and equipment.',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+      ),
     );
   }
 

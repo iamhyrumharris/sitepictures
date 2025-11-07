@@ -69,6 +69,7 @@ class ImportBatch {
   final DateTime? completedAt;
   final ImportPermissionState permissionState;
   final int? deviceFreeSpaceBytes;
+  final DateTime updatedAt;
 
   ImportBatch({
     String? id,
@@ -84,7 +85,9 @@ class ImportBatch {
     this.completedAt,
     required this.permissionState,
     this.deviceFreeSpaceBytes,
-  }) : id = id ?? const Uuid().v4();
+    DateTime? updatedAt,
+  })  : id = id ?? const Uuid().v4(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   ImportBatch copyWith({
     ImportEntryPoint? entryPoint,
@@ -99,6 +102,7 @@ class ImportBatch {
     DateTime? completedAt,
     ImportPermissionState? permissionState,
     int? deviceFreeSpaceBytes,
+    DateTime? updatedAt,
   }) {
     return ImportBatch(
       id: id,
@@ -114,6 +118,7 @@ class ImportBatch {
       completedAt: completedAt ?? this.completedAt,
       permissionState: permissionState ?? this.permissionState,
       deviceFreeSpaceBytes: deviceFreeSpaceBytes ?? this.deviceFreeSpaceBytes,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 
@@ -132,6 +137,7 @@ class ImportBatch {
       'completed_at': completedAt?.toIso8601String(),
       'permission_state': permissionState.dbValue,
       'device_free_space_bytes': deviceFreeSpaceBytes,
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 
@@ -154,8 +160,16 @@ class ImportBatch {
         map['permission_state'] as String,
       ),
       deviceFreeSpaceBytes: map['device_free_space_bytes'] as int?,
+      updatedAt: DateTime.parse(
+        (map['updated_at'] as String?) ?? (map['started_at'] as String),
+      ),
     );
   }
+
+  Map<String, dynamic> toJson() => toMap();
+
+  factory ImportBatch.fromJson(Map<String, dynamic> json) =>
+      ImportBatch.fromMap(json);
 
   static DateTime? _parseNullableDate(Object? value) {
     if (value == null) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/clients/client_detail_screen.dart';
 import 'screens/sites/main_site_screen.dart';
@@ -37,13 +38,14 @@ class AppRouter {
     debugLogDiagnostics: true,
     redirect: (context, state) {
       final isAuthenticated = _authService.isAuthenticated;
-      final isLoggingIn = state.matchedLocation == '/login';
+      final isAuthRoute =
+          state.matchedLocation == '/login' || state.matchedLocation == '/register';
 
-      if (!isAuthenticated && !isLoggingIn) {
+      if (!isAuthenticated && !isAuthRoute) {
         return '/login';
       }
 
-      if (isAuthenticated && isLoggingIn) {
+      if (isAuthenticated && isAuthRoute) {
         return '/home';
       }
 
@@ -52,6 +54,10 @@ class AppRouter {
     routes: [
       // Auth routes (without shell)
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
 
       // Main shell with bottom nav and contextual FAB
       ShellRoute(

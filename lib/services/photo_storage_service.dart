@@ -220,4 +220,24 @@ class PhotoStorageService {
     final appDir = await getApplicationDocumentsDirectory();
     _documentsDirectory = appDir.path;
   }
+
+  /// Persists remote photo bytes into the local documents directory and returns the stored path.
+  static Future<String> saveRemoteBytes(
+    Uint8List bytes, {
+    required String remoteId,
+  }) async {
+    await ensureInitialized();
+    final basePath = _documentsDirectory!;
+    final remoteDir = Directory(p.join(basePath, 'photos', 'remote'));
+    if (!await remoteDir.exists()) {
+      await remoteDir.create(recursive: true);
+    }
+
+    final fileName =
+        'remote_${remoteId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final filePath = p.join(remoteDir.path, fileName);
+    final file = File(filePath);
+    await file.writeAsBytes(bytes, flush: true);
+    return p.relative(filePath, from: basePath);
+  }
 }

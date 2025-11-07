@@ -183,8 +183,12 @@ class NeedsAssignedMoveService {
 
       final placeholders = List.filled(folderIds.length, '?').join(',');
       await txn.rawUpdate(
-        'UPDATE photo_folders SET equipment_id = ?, is_deleted = 0 WHERE id IN ($placeholders)',
-        [targetEquipmentId, ...folderIds],
+        'UPDATE photo_folders SET equipment_id = ?, is_deleted = 0, updated_at = ? WHERE id IN ($placeholders)',
+        [
+          targetEquipmentId,
+          DateTime.now().toIso8601String(),
+          ...folderIds,
+        ],
       );
 
       return NeedsAssignedMoveSummary(
@@ -393,7 +397,10 @@ class NeedsAssignedMoveService {
     final placeholders = List.filled(folderIds.length, '?').join(',');
     await txn.update(
       'photo_folders',
-      {'is_deleted': 1},
+      {
+        'is_deleted': 1,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
       where: 'id IN ($placeholders)',
       whereArgs: folderIds,
     );

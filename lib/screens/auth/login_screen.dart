@@ -152,6 +152,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                   ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => context.go('/register'),
+                    child: const Text("Don't have an account? Create one"),
+                  ),
                 ],
               ),
             ),

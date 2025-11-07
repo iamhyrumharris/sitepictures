@@ -40,6 +40,8 @@ class SyncQueueItem {
       'mainsite',
       'subsite',
       'equipment',
+      'photofolder',
+      'folderphoto',
     ].contains(entityType.toLowerCase())) {
       return false;
     }

@@ -43,6 +43,15 @@ class FolderPhoto {
     };
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'folderId': folderId,
+      'photoId': photoId,
+      'beforeAfter': beforeAfter.toDb(),
+      'addedAt': addedAt.toIso8601String(),
+    };
+  }
+
   /// Create from database map
   factory FolderPhoto.fromMap(Map<String, dynamic> map) {
     return FolderPhoto(
@@ -50,6 +59,15 @@ class FolderPhoto {
       photoId: map['photo_id'],
       beforeAfter: BeforeAfter.fromDb(map['before_after']),
       addedAt: DateTime.parse(map['added_at']),
+    );
+  }
+
+  factory FolderPhoto.fromJson(Map<String, dynamic> json) {
+    return FolderPhoto(
+      folderId: json['folderId'] as String,
+      photoId: json['photoId'] as String,
+      beforeAfter: BeforeAfter.fromDb(json['beforeAfter'] as String),
+      addedAt: DateTime.parse(json['addedAt'] as String),
     );
   }
 

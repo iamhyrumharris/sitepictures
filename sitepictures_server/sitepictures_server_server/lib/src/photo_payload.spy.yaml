@@ -1,0 +1,5 @@
+### Payload used when uploading or downloading a photo binary.
+class: PhotoPayload
+fields:
+  record: PhotoRecord
+  bytes: ByteData?

@@ -1,0 +1,17 @@
+class: PhotoFolderRecord
+table: photo_folder_records
+fields:
+  folderId: String
+  equipmentId: String
+  name: String
+  workOrder: String
+  createdBy: String
+  createdAt: DateTime
+  updatedAt: DateTime
+  isDeleted: bool
+indexes:
+  photo_folder_record_folder_id:
+    fields: folderId
+    unique: true
+  photo_folder_record_equipment_id:
+    fields: equipmentId

@@ -35,4 +35,9 @@ class DuplicateRegistryEntry {
       importedAt: DateTime.parse(map['imported_at'] as String),
     );
   }
+
+  Map<String, dynamic> toJson() => toMap();
+
+  factory DuplicateRegistryEntry.fromJson(Map<String, dynamic> json) =>
+      DuplicateRegistryEntry.fromMap(json);
 }
