@@ -1,0 +1,36 @@
+### Sync queue item for offline operations
+class: SyncQueueItem
+table: sync_queue
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Entity type (photo, client, site, equipment)
+  entityType: String
+  ### Entity ID
+  entityId: String
+  ### Operation (create, update, delete)
+  operation: String
+  ### JSON payload
+  payload: String
+  ### Retry count
+  retryCount: int
+  ### When the item was created
+  createdAt: DateTime
+  ### Last attempt timestamp
+  lastAttempt: DateTime?
+  ### Error message if failed
+  error: String?
+  ### Completion status
+  isCompleted: bool
+
+indexes:
+  syncqueue_uuid_idx:
+    fields: uuid
+    unique: true
+  syncqueue_pending_idx:
+    fields: isCompleted, createdAt
+  syncqueue_entity_idx:
+    fields: entityType, entityId

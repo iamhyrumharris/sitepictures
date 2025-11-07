@@ -1,15 +1,21 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
 import '../models/sync_queue_item.dart';
 import 'database_service.dart';
-import 'api_service.dart';
+import 'serverpod_client_service.dart';
+import 'serverpod_sync_service.dart';
 import 'photo_storage_service.dart';
 
+/// Enhanced SyncService using Serverpod backend
+/// Maintains backward compatibility while using type-safe Serverpod calls
 class SyncService {
   static final SyncService _instance = SyncService._internal();
   final DatabaseService _dbService = DatabaseService();
-  final ApiService _apiService = ApiService();
+  final ServerpodClientService _clientService = ServerpodClientService();
+  final ServerpodSyncService _serverpodSync = ServerpodSyncService();
 
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
@@ -87,20 +93,25 @@ class SyncService {
     _isSyncing = true;
 
     try {
-      final pendingItems = await getPendingItems();
+      // Use Serverpod's bidirectional sync service
+      final results = await _serverpodSync.performSync();
 
-      for (final item in pendingItems) {
-        try {
-          await _syncItem(item);
-        } catch (e) {
-          await _handleSyncError(item, e.toString());
-        }
+      // Check if sync was successful
+      if (results.containsKey('error')) {
+        _isSyncing = false;
+        return false;
       }
 
+      // Sync completed successfully
       _lastSyncTime = DateTime.now();
       _isSyncing = false;
+
+      // Log sync results
+      print('Sync completed: ${results['pulled']} pulled, ${results['pushed']} pushed, ${results['conflicts']} conflicts');
+
       return true;
     } catch (e) {
+      print('Sync error: $e');
       _isSyncing = false;
       return false;
     }
@@ -141,44 +152,71 @@ class SyncService {
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    if (item.operation == 'create') {
-      final storedPath = payload['filePath'] as String;
-      final file = PhotoStorageService.tryResolveLocalFile(storedPath);
+    try {
+      if (item.operation == 'create') {
+        final storedPath = payload['filePath'] as String;
+        final file = PhotoStorageService.tryResolveLocalFile(storedPath);
 
-      if (file != null && await file.exists()) {
-        final response = await _apiService.uploadFile(
-          '/equipment/${payload['equipmentId']}/photos',
-          file.path,
-          {
-            'latitude': payload['latitude'].toString(),
-            'longitude': payload['longitude'].toString(),
-            'timestamp': payload['timestamp'].toString(),
-          },
-        );
+        if (file != null && await file.exists()) {
+          final client = _clientService.client;
+          final bytes = await file.readAsBytes();
+          final byteData = ByteData.sublistView(Uint8List.fromList(bytes));
 
-        return http.Response(
-          await response.stream.bytesToString(),
-          response.statusCode,
-        );
+          // Upload photo using Serverpod
+          await client.photo.uploadPhoto(
+            payload['equipmentId'] as String,
+            byteData,
+            file.path.split('/').last,
+            (payload['latitude'] as num?)?.toDouble() ?? 0.0,
+            (payload['longitude'] as num?)?.toDouble() ?? 0.0,
+            DateTime.parse(payload['timestamp'] as String),
+            payload['capturedBy'] as String? ?? 'unknown',
+            payload['importSource'] as String? ?? 'camera',
+          );
+
+          return http.Response('{"success": true}', 200);
+        }
       }
-    }
 
-    return http.Response('', 400);
+      return http.Response('{"error": "Invalid operation"}', 400);
+    } catch (e) {
+      return http.Response('{"error": "$e"}', 500);
+    }
   }
 
   Future<http.Response> _syncClient(
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post('/clients', payload);
-      case 'update':
-        return await _apiService.put('/clients/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/clients/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    try {
+      final client = _clientService.client;
+
+      switch (item.operation) {
+        case 'create':
+          await client.company.createCompany(
+            payload['name'] as String,
+            payload['description'] as String?,
+            payload['createdBy'] as String,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'update':
+          await client.company.updateCompany(
+            payload['uuid'] as String,
+            payload['name'] as String?,
+            payload['description'] as String?,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'delete':
+          await client.company.deleteCompany(payload['uuid'] as String);
+          return http.Response('{"success": true}', 200);
+
+        default:
+          return http.Response('{"error": "Invalid operation"}', 400);
+      }
+    } catch (e) {
+      return http.Response('{"error": "$e"}', 500);
     }
   }
 
@@ -186,18 +224,40 @@ class SyncService {
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post(
-          '/clients/${payload['clientId']}/sites',
-          payload,
-        );
-      case 'update':
-        return await _apiService.put('/sites/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/sites/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    try {
+      final client = _clientService.client;
+
+      switch (item.operation) {
+        case 'create':
+          await client.site.createMainSite(
+            payload['clientId'] as String,
+            payload['name'] as String,
+            payload['address'] as String?,
+            (payload['latitude'] as num?)?.toDouble(),
+            (payload['longitude'] as num?)?.toDouble(),
+            payload['createdBy'] as String,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'update':
+          await client.site.updateMainSite(
+            payload['uuid'] as String,
+            payload['name'] as String?,
+            payload['address'] as String?,
+            (payload['latitude'] as num?)?.toDouble(),
+            (payload['longitude'] as num?)?.toDouble(),
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'delete':
+          await client.site.deleteMainSite(payload['uuid'] as String);
+          return http.Response('{"success": true}', 200);
+
+        default:
+          return http.Response('{"error": "Invalid operation"}', 400);
+      }
+    } catch (e) {
+      return http.Response('{"error": "$e"}', 500);
     }
   }
 
@@ -205,18 +265,37 @@ class SyncService {
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post(
-          '/sites/${payload['mainSiteId']}/subsites',
-          payload,
-        );
-      case 'update':
-        return await _apiService.put('/subsites/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/subsites/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    try {
+      final client = _clientService.client;
+
+      switch (item.operation) {
+        case 'create':
+          await client.site.createSubSite(
+            payload['name'] as String,
+            payload['description'] as String?,
+            payload['createdBy'] as String,
+            clientId: payload['clientId'] as String?,
+            mainSiteId: payload['mainSiteId'] as String?,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'update':
+          await client.site.updateSubSite(
+            payload['uuid'] as String,
+            payload['name'] as String?,
+            payload['description'] as String?,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'delete':
+          await client.site.deleteSubSite(payload['uuid'] as String);
+          return http.Response('{"success": true}', 200);
+
+        default:
+          return http.Response('{"error": "Invalid operation"}', 400);
+      }
+    } catch (e) {
+      return http.Response('{"error": "$e"}', 500);
     }
   }
 
@@ -224,15 +303,42 @@ class SyncService {
     SyncQueueItem item,
     Map<String, dynamic> payload,
   ) async {
-    switch (item.operation) {
-      case 'create':
-        return await _apiService.post('/equipment', payload);
-      case 'update':
-        return await _apiService.put('/equipment/${item.entityId}', payload);
-      case 'delete':
-        return await _apiService.delete('/equipment/${item.entityId}');
-      default:
-        return http.Response('', 400);
+    try {
+      final client = _clientService.client;
+
+      switch (item.operation) {
+        case 'create':
+          await client.equipment.createEquipment(
+            payload['name'] as String,
+            payload['serialNumber'] as String?,
+            payload['manufacturer'] as String?,
+            payload['model'] as String?,
+            payload['createdBy'] as String,
+            clientId: payload['clientId'] as String,
+            mainSiteId: payload['mainSiteId'] as String?,
+            subSiteId: payload['subSiteId'] as String?,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'update':
+          await client.equipment.updateEquipment(
+            payload['uuid'] as String,
+            payload['name'] as String?,
+            payload['serialNumber'] as String?,
+            payload['manufacturer'] as String?,
+            payload['model'] as String?,
+          );
+          return http.Response('{"success": true}', 200);
+
+        case 'delete':
+          await client.equipment.deleteEquipment(payload['uuid'] as String);
+          return http.Response('{"success": true}', 200);
+
+        default:
+          return http.Response('{"error": "Invalid operation"}', 400);
+      }
+    } catch (e) {
+      return http.Response('{"error": "$e"}', 500);
     }
   }
 

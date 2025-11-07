@@ -79,6 +79,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  String _formatSyncTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inMinutes < 1) {
+      return 'just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final authState = context.watch<AuthState>();
     final syncState = context.watch<SyncState>();
@@ -93,20 +108,65 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: () => context.push('/search'),
           tooltip: 'Search',
         ),
-        // Sync status
-        if (syncState.pendingCount > 0)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: Badge(
-                label: Text('${syncState.pendingCount}'),
-                child: IconButton(
-                  icon: const Icon(Icons.cloud_upload),
-                  onPressed: () => syncState.syncAll(),
-                ),
-              ),
-            ),
+        // Sync button - always visible
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Center(
+            child: syncState.isSyncing
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : syncState.pendingCount > 0
+                    ? Badge(
+                        label: Text('${syncState.pendingCount}'),
+                        child: IconButton(
+                          icon: const Icon(Icons.cloud_upload),
+                          onPressed: () async {
+                            final success = await syncState.syncAll();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(success
+                                      ? 'Sync completed successfully'
+                                      : 'Sync failed - check connection'),
+                                  backgroundColor:
+                                      success ? Colors.green : Colors.red,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          tooltip: 'Sync ${syncState.pendingCount} pending items',
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.cloud_done),
+                        onPressed: () async {
+                          final success = await syncState.syncAll();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success
+                                    ? 'Already up to date'
+                                    : 'Sync failed - check connection'),
+                                backgroundColor:
+                                    success ? Colors.green : Colors.orange,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        tooltip: syncState.lastSyncTime != null
+                            ? 'Last synced: ${_formatSyncTime(syncState.lastSyncTime!)}'
+                            : 'Sync with server',
+                      ),
           ),
+        ),
         // User menu
         PopupMenuButton<String>(
           icon: const Icon(Icons.account_circle),
@@ -347,6 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
               final navigator = Navigator.of(context);
               final scaffoldMessenger = ScaffoldMessenger.of(context);
               final authState = context.read<AuthState>();
+              final syncState = context.read<SyncState>();
 
               try {
                 // Get current user ID or use system default
@@ -363,6 +424,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 final db = await _dbService.database;
                 await db.insert('clients', client.toMap());
+
+                // Queue for sync
+                await syncState.queueForSync(
+                  entityType: 'client',
+                  entityId: client.id,
+                  operation: 'create',
+                  payload: client.toMap(),
+                );
 
                 navigator.pop();
                 scaffoldMessenger.showSnackBar(

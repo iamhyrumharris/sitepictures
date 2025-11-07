@@ -7,6 +7,7 @@ import '../models/equipment.dart';
 import '../models/photo_folder.dart';
 import '../models/folder_photo.dart';
 import '../providers/all_photos_provider.dart';
+import '../providers/sync_state.dart';
 import '../services/database_service.dart';
 import '../services/photo_storage_service.dart';
 
@@ -32,14 +33,17 @@ class PhotoSaveService {
   final StreamController<SaveProgress> _progressController =
       StreamController<SaveProgress>.broadcast();
   final AllPhotosProvider? _allPhotosProvider;
+  final SyncState? _syncState;
 
   PhotoSaveService({
     required DatabaseService databaseService,
     required PhotoStorageService storageService,
     AllPhotosProvider? allPhotosProvider,
+    SyncState? syncState,
   }) : _db = databaseService,
        _storage = storageService,
-       _allPhotosProvider = allPhotosProvider;
+       _allPhotosProvider = allPhotosProvider,
+       _syncState = syncState;
 
   /// Stream of save progress events during incremental save
   Stream<SaveProgress> get progressStream => _progressController.stream;
@@ -405,7 +409,7 @@ class PhotoSaveService {
     final fileSize = await file.length();
 
     // Insert photo into database
-    await db.insert('photos', {
+    final photoData = {
       'id': tempPhoto.id,
       'equipment_id': equipmentId,
       'file_path': storedPath,
@@ -419,7 +423,19 @@ class PhotoSaveService {
       'synced_at': null,
       'remote_url': null,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    await db.insert('photos', photoData);
+
+    // Queue for sync
+    if (_syncState != null) {
+      await _syncState.queueForSync(
+        entityType: 'photo',
+        entityId: tempPhoto.id,
+        operation: 'create',
+        payload: photoData,
+      );
+    }
   }
 
   /// Save individual photo to folder with before/after categorization
@@ -442,24 +458,27 @@ class PhotoSaveService {
     final file = File(absolutePath);
     final fileSize = await file.length();
 
+    // Prepare photo data
+    final photoData = {
+      'id': tempPhoto.id,
+      'equipment_id': equipmentId,
+      'file_path': storedPath,
+      'thumbnail_path': null, // Generate asynchronously later
+      'latitude': 0.0, // TODO: Get from location service
+      'longitude': 0.0, // TODO: Get from location service
+      'timestamp': tempPhoto.captureTimestamp.toIso8601String(),
+      'captured_by': 'SYSTEM', // TODO: Get from current user
+      'file_size': fileSize,
+      'is_synced': 0,
+      'synced_at': null,
+      'remote_url': null,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
     // Use transaction to ensure atomicity
     await db.transaction((txn) async {
       // Insert photo
-      await txn.insert('photos', {
-        'id': tempPhoto.id,
-        'equipment_id': equipmentId,
-        'file_path': storedPath,
-        'thumbnail_path': null, // Generate asynchronously later
-        'latitude': 0.0, // TODO: Get from location service
-        'longitude': 0.0, // TODO: Get from location service
-        'timestamp': tempPhoto.captureTimestamp.toIso8601String(),
-        'captured_by': 'SYSTEM', // TODO: Get from current user
-        'file_size': fileSize,
-        'is_synced': 0,
-        'synced_at': null,
-        'remote_url': null,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      await txn.insert('photos', photoData);
 
       // Create folder-photo association
       await txn.insert('folder_photos', {
@@ -469,6 +488,16 @@ class PhotoSaveService {
         'added_at': DateTime.now().toIso8601String(),
       });
     });
+
+    // Queue for sync (outside transaction)
+    if (_syncState != null) {
+      await _syncState.queueForSync(
+        entityType: 'photo',
+        entityId: tempPhoto.id,
+        operation: 'create',
+        payload: photoData,
+      );
+    }
   }
 
   void _notifyAllPhotosProvider(List<String> savedIds) {
@@ -478,7 +507,7 @@ class PhotoSaveService {
     if (savedIds.isEmpty) {
       return;
     }
-    _allPhotosProvider!.invalidate();
+    _allPhotosProvider.invalidate();
   }
 
   /// Dispose of resources

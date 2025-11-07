@@ -133,4 +133,139 @@ All articles validated:
 - Article VIII (Modular Independence): Clean service separation, extends existing camera feature ✓
 
 <!-- MANUAL ADDITIONS START -->
+
+## Serverpod Backend Architecture (2025-11-06)
+
+### Overview
+Integrated Serverpod 2.9.2 as the backend for the sitepictures Flutter application. The backend provides type-safe REST API endpoints, PostgreSQL database, Redis caching, and file storage for photos.
+
+### Project Structure
+```
+sitepictures_server/
+├── sitepictures_server_server/      # Backend server
+│   ├── lib/src/
+│   │   ├── models/                  # Protocol definitions (YAML)
+│   │   ├── generated/               # Auto-generated Dart code
+│   │   └── endpoints/               # API endpoints
+│   ├── docker-compose.yaml          # PostgreSQL + Redis
+│   └── migrations/                  # Database migrations
+├── sitepictures_server_client/      # Generated Dart client for Flutter
+└── sitepictures_server_flutter/     # Sample app (not used)
+```
+
+### Data Models
+
+All models use a dual-ID strategy for compatibility:
+- **Database ID**: Auto-increment `int?` for Serverpod operations
+- **UUID Field**: `String uuid` for compatibility with Flutter app's SQLite schema
+
+**Models:**
+- `User` - Authentication and user management
+- `Company` (renamed from Client) - Client/company management
+- `MainSite` - Main site/location with GPS coordinates
+- `SubSite` - Sub-site with flexible hierarchy (client, main site, or nested)
+- `Equipment` - Equipment with flexible placement
+- `Photo` - Photo metadata with sync status and file storage integration
+- `PhotoFolder` - Photo organization
+- `FolderPhoto` - Junction table for folder-photo relationships
+- `SyncQueueItem` - Offline sync queue
+- `ImportBatch` - Gallery import tracking
+
+### API Endpoints
+
+**AuthEndpoint** (`lib/src/endpoints/auth_endpoint.dart`):
+- `login(email, password)` - User authentication
+- `register(email, name, password, role)` - User registration
+- `getCurrentUser(uuid)` - Get user by UUID
+- `logout()` - Logout placeholder
+
+**CompanyEndpoint** (`lib/src/endpoints/company_endpoint.dart`):
+- `getAllCompanies(includeSystem)` - List all companies
+- `getCompanyByUuid(uuid)` - Get single company
+- `createCompany(name, description, createdBy)` - Create new company
+- `updateCompany(uuid, name, description)` - Update company
+- `deleteCompany(uuid)` - Soft delete company
+
+**SiteEndpoint** (`lib/src/endpoints/site_endpoint.dart`):
+- **MainSite**: `getMainSitesByCompany`, `createMainSite`, `updateMainSite`, `deleteMainSite`
+- **SubSite**: `getSubSitesByParent`, `createSubSite`, `updateSubSite`, `deleteSubSite`
+
+**EquipmentEndpoint** (`lib/src/endpoints/equipment_endpoint.dart`):
+- `getEquipmentByParent(clientId/mainSiteId/subSiteId)` - List equipment
+- `createEquipment(...)` - Create equipment with flexible hierarchy
+- `updateEquipment`, `deleteEquipment`
+
+**PhotoEndpoint** (`lib/src/endpoints/photo_endpoint.dart`):
+- `getPhotosByEquipment(equipmentId, limit, offset)` - Paginated photo list
+- `uploadPhoto(equipmentId, fileData, metadata)` - Upload photo with Serverpod storage
+- `createPhoto(...)` - Create photo metadata only
+- `getUnsyncedPhotos()` - Get photos needing sync
+- `markPhotoAsSynced(uuid)` - Mark as synced
+- `deletePhoto(uuid)` - Delete photo and file
+- `getPhotoUrl(uuid)` - Get temporary download URL
+
+**FolderEndpoint** (`lib/src/endpoints/folder_endpoint.dart`):
+- `getFoldersByEquipment(equipmentId)` - List folders
+- `createFolder(equipmentId, name, workOrder, createdBy)` - Create folder
+- `addPhotoToFolder(folderId, photoId, beforeAfter)` - Add photo
+- `getPhotosInFolder(folderId, beforeAfterFilter)` - Get folder photos
+- `removePhotoFromFolder`, `deleteFolder`
+
+**SyncEndpoint** (`lib/src/endpoints/sync_endpoint.dart`):
+- `getChangesSince(timestamp)` - Pull changes from server
+- `pushChanges(changes)` - Push local changes with conflict resolution
+- Implements last-write-wins strategy for conflicts
+
+### File Storage
+
+Photos are stored using Serverpod's built-in cloud storage:
+- **Storage ID**: `public`
+- **Path Format**: `photos/{equipmentId}/{uuid}/{filename}`
+- **Features**:
+  - Automatic file management
+  - Temporary URL generation for downloads
+  - File deletion on photo removal
+
+### Database Configuration
+
+**Development** (docker-compose.yaml):
+- PostgreSQL: `localhost:8090`
+- Redis: `localhost:8091`
+- Database: `sitepictures_server`
+
+**Migrations**: Two migrations created
+1. `20251106193441725` - Serverpod system tables
+2. `20251106195139239` - Application tables (users, clients, photos, etc.)
+
+### Key Design Decisions
+
+1. **Client → Company Rename**: Avoided Serverpod reserved name conflict
+2. **Dual-ID Strategy**: Maintains compatibility with existing Flutter SQLite schema
+3. **Index Prefixing**: All indexes prefixed with model name (e.g., `user_email_idx`)
+4. **File Storage**: Uses Serverpod's built-in storage (can upgrade to S3 later)
+5. **Conflict Resolution**: Last-write-wins based on `updatedAt` timestamps
+6. **Soft Deletes**: All main entities use `isActive` flag instead of hard deletes
+
+### Next Steps for Integration
+
+1. **Update Flutter App**:
+   - Add `serverpod_flutter` dependency to `pubspec.yaml`
+   - Replace `ApiService` with Serverpod client
+   - Update `SyncService` to use new sync endpoints
+   - Keep SQLite for offline storage
+
+2. **Start Server**:
+   ```bash
+   cd sitepictures_server/sitepictures_server_server
+   docker compose up -d
+   dart bin/main.dart --apply-migrations
+   dart bin/main.dart
+   ```
+
+3. **Testing**: Create integration tests for sync flow
+
+### Documentation
+- Server README: `sitepictures_server/README.md`
+- Serverpod Docs: https://docs.serverpod.dev/
+
 <!-- MANUAL ADDITIONS END -->

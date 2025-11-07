@@ -1,0 +1,38 @@
+### Sub site model with flexible hierarchy
+class: SubSite
+table: sub_sites
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Parent client ID (if attached to client)
+  clientId: String?
+  ### Parent main site ID (if attached to main site)
+  mainSiteId: String?
+  ### Parent subsite ID (if nested subsite)
+  parentSubSiteId: String?
+  ### Site name
+  name: String
+  ### Optional description
+  description: String?
+  ### User who created this site
+  createdBy: String
+  ### When the site was created
+  createdAt: DateTime
+  ### When the site was last updated
+  updatedAt: DateTime
+  ### Active/inactive flag
+  isActive: bool
+
+indexes:
+  subsite_uuid_idx:
+    fields: uuid
+    unique: true
+  subsite_client_active_idx:
+    fields: clientId, isActive
+  subsite_mainsite_active_idx:
+    fields: mainSiteId, isActive
+  subsite_parent_active_idx:
+    fields: parentSubSiteId, isActive

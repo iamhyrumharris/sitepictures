@@ -1,0 +1,58 @@
+### Photo model with file storage and sync metadata
+class: Photo
+table: photos
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Equipment ID this photo belongs to
+  equipmentId: String
+  ### File path or storage key
+  filePath: String
+  ### Thumbnail path or storage key
+  thumbnailPath: String?
+  ### Latitude coordinate
+  latitude: double
+  ### Longitude coordinate
+  longitude: double
+  ### Photo timestamp
+  timestamp: DateTime
+  ### User who captured this photo
+  capturedBy: String
+  ### File size in bytes
+  fileSize: int
+  ### Sync status flag
+  isSynced: bool
+  ### When the photo was synced
+  syncedAt: DateTime?
+  ### Remote URL (for downloaded photos)
+  remoteUrl: String?
+  ### Source asset ID (for gallery imports)
+  sourceAssetId: String?
+  ### SHA1 fingerprint for deduplication
+  fingerprintSha1: String?
+  ### Import batch ID (for gallery imports)
+  importBatchId: String?
+  ### Import source (camera, gallery)
+  importSource: String
+  ### When the photo was created
+  createdAt: DateTime
+
+indexes:
+  photo_uuid_idx:
+    fields: uuid
+    unique: true
+  photo_equipment_timestamp_idx:
+    fields: equipmentId, timestamp
+  photo_sync_status_idx:
+    fields: isSynced, createdAt
+  photo_timestamp_idx:
+    fields: timestamp
+  photo_source_asset_idx:
+    fields: sourceAssetId
+  photo_fingerprint_idx:
+    fields: fingerprintSha1
+  photo_import_batch_idx:
+    fields: importBatchId

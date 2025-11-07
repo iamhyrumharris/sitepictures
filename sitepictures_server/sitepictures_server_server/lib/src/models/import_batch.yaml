@@ -1,0 +1,42 @@
+### Import batch tracking for gallery imports
+class: ImportBatch
+table: import_batches
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Entry point (equipment, folder)
+  entryPoint: String
+  ### Equipment ID if applicable
+  equipmentId: String?
+  ### Folder ID if applicable
+  folderId: String?
+  ### Destination category
+  destinationCategory: String
+  ### Number of photos selected
+  selectedCount: int
+  ### Number of photos imported
+  importedCount: int
+  ### Number of duplicates found
+  duplicateCount: int
+  ### Number of failed imports
+  failedCount: int
+  ### When import started
+  startedAt: DateTime
+  ### When import completed
+  completedAt: DateTime?
+  ### Permission state
+  permissionState: String
+  ### Device free space in bytes
+  deviceFreeSpaceBytes: int?
+
+indexes:
+  importbatch_uuid_idx:
+    fields: uuid
+    unique: true
+  importbatch_started_idx:
+    fields: startedAt
+  importbatch_equipment_idx:
+    fields: equipmentId

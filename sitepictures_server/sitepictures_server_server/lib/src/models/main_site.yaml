@@ -1,0 +1,34 @@
+### Main site model
+class: MainSite
+table: main_sites
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Parent client ID
+  clientId: String
+  ### Site name
+  name: String
+  ### Optional address
+  address: String?
+  ### Latitude coordinate
+  latitude: double?
+  ### Longitude coordinate
+  longitude: double?
+  ### User who created this site
+  createdBy: String
+  ### When the site was created
+  createdAt: DateTime
+  ### When the site was last updated
+  updatedAt: DateTime
+  ### Active/inactive flag
+  isActive: bool
+
+indexes:
+  mainsite_uuid_idx:
+    fields: uuid
+    unique: true
+  mainsite_client_active_idx:
+    fields: clientId, isActive

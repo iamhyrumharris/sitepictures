@@ -1,0 +1,48 @@
+auth:
+  - login:
+  - register:
+  - getCurrentUser:
+  - logout:
+company:
+  - getAllCompanies:
+  - getCompanyByUuid:
+  - createCompany:
+  - updateCompany:
+  - deleteCompany:
+equipment:
+  - getEquipmentByParent:
+  - getEquipmentByUuid:
+  - createEquipment:
+  - updateEquipment:
+  - deleteEquipment:
+folder:
+  - getFoldersByEquipment:
+  - getFolderByUuid:
+  - createFolder:
+  - addPhotoToFolder:
+  - getPhotosInFolder:
+  - removePhotoFromFolder:
+  - deleteFolder:
+photo:
+  - getPhotosByEquipment:
+  - getPhotoByUuid:
+  - createPhoto:
+  - uploadPhoto:
+  - getUnsyncedPhotos:
+  - markPhotoAsSynced:
+  - deletePhoto:
+  - getPhotoUrl:
+site:
+  - getMainSitesByCompany:
+  - getMainSiteByUuid:
+  - createMainSite:
+  - updateMainSite:
+  - deleteMainSite:
+  - getSubSitesByParent:
+  - getSubSiteByUuid:
+  - createSubSite:
+  - updateSubSite:
+  - deleteSubSite:
+sync:
+  - getChangesSince:
+  - pushChanges:

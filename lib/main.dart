@@ -15,10 +15,19 @@ import 'services/photo_storage_service.dart';
 import 'services/import_repository.dart';
 import 'services/import_service.dart';
 import 'services/analytics_logger.dart';
+import 'services/serverpod_client_service.dart';
 import 'router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Serverpod client for backend sync (hybrid mode: SQLite + Serverpod)
+  // Use your computer's IP address when testing on physical device
+  // Change to your production server URL for deployment
+  // NOTE: URL must end with trailing slash (/)
+  ServerpodClientService().initialize(
+    serverUrl: 'http://10.0.0.142:8080/', // Change to http://localhost:8080/ for emulator
+  );
 
   // Initialize services
   final dbService = DatabaseService();

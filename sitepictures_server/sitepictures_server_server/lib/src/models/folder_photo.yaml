@@ -1,0 +1,22 @@
+### Junction table for folder-photo relationships
+class: FolderPhoto
+table: folder_photos
+
+fields:
+  ### Folder ID
+  folderId: String
+  ### Photo ID
+  photoId: String
+  ### Before or after indicator
+  beforeAfter: String
+  ### When the photo was added to folder
+  addedAt: DateTime
+
+indexes:
+  folder_idx:
+    fields: folderId
+  photo_idx:
+    fields: photoId
+  folder_photo_idx:
+    fields: folderId, photoId
+    unique: true

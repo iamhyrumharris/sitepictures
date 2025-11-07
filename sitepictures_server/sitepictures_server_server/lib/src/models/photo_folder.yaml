@@ -1,0 +1,30 @@
+### Photo folder model for organizing photos
+class: PhotoFolder
+table: photo_folders
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Equipment ID this folder belongs to
+  equipmentId: String
+  ### Folder name
+  name: String
+  ### Work order number
+  workOrder: String
+  ### When the folder was created
+  createdAt: DateTime
+  ### User who created this folder
+  createdBy: String
+  ### Soft delete flag
+  isDeleted: bool
+
+indexes:
+  photofolder_uuid_idx:
+    fields: uuid
+    unique: true
+  photofolder_equipment_idx:
+    fields: equipmentId
+  photofolder_equipment_created_idx:
+    fields: equipmentId, createdAt

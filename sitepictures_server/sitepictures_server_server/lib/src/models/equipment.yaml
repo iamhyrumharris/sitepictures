@@ -1,0 +1,42 @@
+### Equipment model with flexible hierarchy
+class: Equipment
+table: equipment
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Parent client ID (if attached to client)
+  clientId: String?
+  ### Parent main site ID (if attached to main site)
+  mainSiteId: String?
+  ### Parent sub site ID (if attached to sub site)
+  subSiteId: String?
+  ### Equipment name
+  name: String
+  ### Serial number
+  serialNumber: String?
+  ### Manufacturer name
+  manufacturer: String?
+  ### Model name
+  model: String?
+  ### User who created this equipment
+  createdBy: String
+  ### When the equipment was created
+  createdAt: DateTime
+  ### When the equipment was last updated
+  updatedAt: DateTime
+  ### Active/inactive flag
+  isActive: bool
+
+indexes:
+  equipment_uuid_idx:
+    fields: uuid
+    unique: true
+  equipment_client_active_idx:
+    fields: clientId, isActive
+  equipment_mainsite_active_idx:
+    fields: mainSiteId, isActive
+  equipment_subsite_active_idx:
+    fields: subSiteId, isActive

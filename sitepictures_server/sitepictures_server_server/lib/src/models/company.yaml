@@ -1,0 +1,33 @@
+### Company/Client model
+class: Company
+table: clients
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### Company name (unique)
+  name: String
+  ### Optional description
+  description: String?
+  ### System client flag (for special clients like "Needs Assigned")
+  isSystem: bool
+  ### User who created this company
+  createdBy: String
+  ### When the company was created
+  createdAt: DateTime
+  ### When the company was last updated
+  updatedAt: DateTime
+  ### Active/inactive flag
+  isActive: bool
+
+indexes:
+  uuid_idx:
+    fields: uuid
+    unique: true
+  name_idx:
+    fields: name
+    unique: true
+  company_system_active_idx:
+    fields: isSystem, isActive

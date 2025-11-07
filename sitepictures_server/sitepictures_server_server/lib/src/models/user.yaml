@@ -1,0 +1,29 @@
+### User model for authentication and ownership tracking
+class: User
+table: users
+
+fields:
+  ### Auto-increment ID
+  id: int?
+  ### UUID for compatibility with Flutter app
+  uuid: String
+  ### User email address (unique)
+  email: String
+  ### User's full name
+  name: String
+  ### User role (admin, manager, technician, viewer)
+  role: String
+  ### When the user was created
+  createdAt: DateTime
+  ### When the user was last updated
+  updatedAt: DateTime
+  ### Last sync timestamp
+  lastSyncAt: DateTime?
+
+indexes:
+  user_uuid_idx:
+    fields: uuid
+    unique: true
+  user_email_idx:
+    fields: email
+    unique: true
